@@ -498,3 +498,32 @@ body.assessment-open{overflow:hidden}
 .growth-card p{font-size:10px;line-height:1.6;color:#718198;margin:7px 0 0}
 @media(max-width:650px){.report-chart-grid{grid-template-columns:1fr}.report-donut-wrap{justify-content:flex-start}.growth-grid{grid-template-columns:1fr}}
 @media print{.report-chart-card,.growth-card{break-inside:avoid}.report-donut{-webkit-print-color-adjust:exact;print-color-adjust:exact}.report-bar-track i{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+
+/* Assessment savings breakdown and package recommendations */
+.assessment-field-note,.report-field-note{font-size:11px;line-height:1.6;color:#74849a;margin:10px 0}
+.function-hours-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.function-hours-field{display:grid;gap:7px;padding:12px;border:1px solid #e1e9f2;border-radius:9px;background:#fbfcfe}
+.function-hours-field>span{font-size:11px;font-weight:700;color:#405671}
+.function-hours-field>div{display:flex;align-items:center;gap:8px}
+.function-hours-field input{min-width:0;flex:1;width:100%;border:1px solid #d9e3ef;border-radius:7px;padding:9px 10px;font:500 12px 'DM Sans',sans-serif;color:#1b2c45;background:#fff}
+.function-hours-field small{font-size:9px;color:#8492a4;white-space:nowrap}
+.report-table-wrap{overflow-x:auto;border:1px solid #e2eaf3;border-radius:10px}
+.report-savings-table{width:100%;border-collapse:collapse;font-size:10px;min-width:560px}
+.report-savings-table th{background:#f1f6fc;color:#526780;text-align:left;font-size:9px;letter-spacing:.3px;padding:11px 10px}
+.report-savings-table td{padding:12px 10px;border-top:1px solid #e8eef5;color:#526780;vertical-align:top}
+.report-savings-table td strong,.report-savings-table td small{display:block}
+.report-savings-table td strong{font:700 11px 'Manrope';color:#1d3453}
+.report-savings-table td small{max-width:230px;margin-top:4px;font-size:9px;line-height:1.5;color:#8190a3}
+.report-total{display:grid;gap:5px;margin-top:13px;padding:17px 18px;border-radius:10px;background:linear-gradient(120deg,#edf5ff,#e9f9fb);border:1px solid #dcebf8}
+.report-total span{font-size:9px;font-weight:800;letter-spacing:1px;color:#637b97}
+.report-total strong{font:800 23px 'Manrope';color:#1c4f88}
+.report-total small{font-size:10px;line-height:1.55;color:#637b97}
+.package-recommendations{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;margin-top:14px}
+.package-card{padding:16px;border:1px solid #dce8f4;border-radius:11px;background:linear-gradient(145deg,#fff,#f6f9fd)}
+.package-card>span{display:block;margin-bottom:8px;font-size:8px;letter-spacing:1px;font-weight:800;color:#3478f6}
+.package-card>strong{display:block;font:800 14px/1.35 'Manrope';color:#1d3453}
+.package-card p{font-size:10px;line-height:1.6;color:#718198;margin:8px 0}
+.package-card small{display:block;padding-top:9px;border-top:1px solid #e6edf5;font-size:10px;line-height:1.5;font-weight:700;color:#395d83}
+@media(max-width:600px){.function-hours-grid,.package-recommendations{grid-template-columns:1fr}}
+@media print{.report-savings-table th,.report-total,.package-card{ -webkit-print-color-adjust:exact;print-color-adjust:exact}.report-table-wrap,.package-card,.report-total{break-inside:avoid}}
