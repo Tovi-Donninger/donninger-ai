@@ -596,3 +596,12 @@ body.assessment-open{overflow:hidden}
  .function-outcome-grid{grid-template-columns:1fr 1fr}
  .automation-function-button{padding:15px}
 }
+
+.function-page .menu-toggle{display:none}
+@media(max-width:760px){
+ .function-page .menu-toggle{display:block}
+ .function-page .nav{display:none;position:absolute;top:68px;left:0;right:0;padding:16px 22px 20px;background:#fff;border-bottom:1px solid #e2e9f2;box-shadow:0 14px 24px rgba(30,48,41,.08);flex-direction:column;align-items:stretch;gap:0}
+ .function-page .nav.open{display:flex}
+ .function-page .nav a{padding:13px 4px;border-bottom:1px solid #edf1ec}
+ .function-page .nav .nav-cta{text-align:center;margin-top:10px;border:0;padding:13px}
+}
