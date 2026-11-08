@@ -180,7 +180,7 @@ function buildBusinessReport() {
     const moneyLow = money(annualLow*rate);
     const moneyHigh = money(annualHigh*rate);
     highlight = moneyLow+'–'+moneyHigh+' / year';
-    note = 'Indicative labour-capacity value using your hourly cost and a 20–30% reduction assumption. This is not a guaranteed cash saving.';
+    note = 'Your current repetitive admin represents about '+money(hours*46*rate)+' in annual labour capacity. The range above models 20–30% of that value potentially released — not guaranteed cash savings.';
   }
   return {
     title:company+'Automation opportunity overview',
@@ -237,7 +237,7 @@ function renderBusinessVisuals(report) {
       : item.hoursLow+'–'+item.hoursHigh+' hrs';
     return '<div class="report-bar-row"><div class="report-bar-label"><span>'+escapeHtml(item.name)+'</span><strong>'+valueText+'</strong></div><div class="report-bar-track"><i style="width:'+pct+'%;background:'+item.colour+'"></i></div></div>';
   }).join('');
-  const legend = chart.items.map(item=>'<div class="report-legend-item"><i style="background:'+item.colour+'"></i><span>'+escapeHtml(item.name)+'</span></div>').join('');
+  const legend = chart.items.map(item=>'<div class="report-legend-item"><i style="background:'+item.colour+'"></i><span>'+escapeHtml(item.name)+' <b>'+Math.round(item.share*100)+'%</b></span></div>').join('');
   const growth = report.growth.map((item,i)=>'<article class="growth-card"><span>GROWTH '+(i+1)+'</span><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></article>').join('');
   return '<section class="report-section"><h3>Where automation could release capacity</h3><p class="report-chart-intro">Illustrative allocation of the potential time opportunity across the business functions you selected. It is a planning model, not measured departmental waste.</p><div class="report-chart-grid"><article class="report-chart-card"><div class="report-chart-heading"><strong>Opportunity by function</strong><small>Share of estimated opportunity</small></div><div class="report-donut-wrap"><div class="report-donut" style="background:conic-gradient('+stops+')"><span>Potential<br>capacity</span></div><div class="report-legend">'+legend+'</div></div></article><article class="report-chart-card"><div class="report-chart-heading"><strong>Estimated annual capacity</strong><small>'+(Number(answers.hourlyCost||0)?'Indicative labour value':'Hours potentially reclaimed')+'</small></div><div class="report-bars">'+bars+'</div></article></div></section><section class="report-section"><h3>Where the business could grow</h3><p class="report-chart-intro">These are growth levers to investigate after improving the underlying workflows.</p><div class="growth-grid">'+growth+'</div></section>';
 }
