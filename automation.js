@@ -530,18 +530,39 @@ const P={
   }
 };
 
+
 const esc=v=>String(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const icons={"sales":"↗","marketing":"✦","customer-service":"◌","hr-recruitment":"◎","finance":"＄","operations":"⌘","stock-logistics":"▦","management":"▥"};
+const labels={"sales":"SALES ENGINE","marketing":"CAMPAIGN WORKSPACE","customer-service":"CUSTOMER EXPERIENCE","hr-recruitment":"PEOPLE OPERATIONS","finance":"FINANCE OPERATIONS","operations":"BUSINESS OPERATIONS","stock-logistics":"SUPPLY CHAIN","management":"BUSINESS INTELLIGENCE"};
 const key=new URLSearchParams(location.search).get("function")||"sales";
 const item=P[key]||P.sales;
-const fill=(id,arr)=>{const el=document.getElementById(id);if(el)el.replaceChildren(...arr.map(v=>{const li=document.createElement("li");li.textContent=v;return li;}));};
+const setText=(id,value)=>{const el=document.getElementById(id);if(el)el.textContent=value||"";};
+const fillList=(id,arr)=>{const el=document.getElementById(id);if(el)el.innerHTML=(arr||[]).map(v=>"<li>"+esc(v)+"</li>").join("");};
 document.title=item.title+" | Donninger.AI";
-const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=item.title+". Explore practical examples of automated tasks and AI-assisted workflows.";
-document.getElementById("functionTitle").textContent=item.title;
-document.getElementById("functionIntro").textContent=item.intro;
-document.getElementById("functionOverview").textContent=item.overview;
-document.getElementById("functionOversight").textContent=item.oversight;
-["workflow","tasks","assisted"].forEach(k=>fill("function"+k[0].toUpperCase()+k.slice(1),item[k]));
-const out=document.getElementById("functionOutcomes");if(out)out.innerHTML=item.outcomes.map((v,i)=>"<article><span>0"+(i+1)+"</span><strong>"+esc(v)+"</strong></article>").join("");
+const meta=document.querySelector('meta[name="description"]');if(meta)meta.content=item.title+". See the workflow, capabilities, controls and business measures.";
+setText("functionTitle",item.title);
+setText("functionIntro",item.intro);
+setText("functionOverview",item.overview);
+setText("functionOversight",item.oversight);
+setText("functionLabel",labels[key]||"BUSINESS AUTOMATION");
+const art=document.getElementById("functionHeroArt");
+if(art)art.innerHTML='<div class="function-art-orbit orbit-a"></div><div class="function-art-orbit orbit-b"></div><div class="function-art-window"><div class="function-art-window-top"><span><i></i><i></i><i></i></span><small>DONNINGER.AI / '+esc((labels[key]||"WORKSPACE").replaceAll(" ","_"))+'</small><b>•••</b></div><div class="function-art-window-body"><div class="function-art-sidebar"><b>'+esc(icons[key]||"✦")+'</b><i></i><i></i><i></i><i></i></div><div class="function-art-dashboard"><div class="function-art-greeting"><small>YOUR WORKSPACE</small><strong>'+esc(item.title.replace(" Automation",""))+'</strong></div><div class="function-art-stats"><span><small>WORKFLOW</small><b>Connected</b><i></i></span><span><small>APPROVALS</small><b>In your control</b><i></i></span></div><div class="function-art-graph"><div><b></b><b></b><b></b><b></b><b></b><b></b><b></b><b></b></div><small>ACTIVITY & PERFORMANCE OVERVIEW</small></div><div class="function-art-activity"><i></i><span><b></b><small></small></span><em>Ready for review</em></div><div class="function-art-activity"><i></i><span><b></b><small></small></span><em>Workflow active</em></div></div></div></div><div class="function-art-float float-one"><span>✓</span><div><b>Clear process</b><small>Every step accounted for</small></div></div><div class="function-art-float float-two"><span>↗</span><div><b>Human oversight</b><small>Your team stays in control</small></div></div>';
+const workflow=document.getElementById("functionWorkflowDiagram");
+if(workflow)workflow.innerHTML=(item.workflow||[]).map((step,i)=>'<div class="function-flow-step '+(i===item.workflow.length-1?'flow-end':'')+'"><span class="function-flow-index">'+String(i+1).padStart(2,"0")+'</span><div><strong>'+esc(step)+'</strong><small>'+(i===0?"TRIGGER / INPUT":i===item.workflow.length-1?"OUTPUT / RECORD":i%3===2?"REVIEW / DECISION":"AUTOMATED OR ASSISTED STEP")+'</small></div><span class="function-flow-status">'+(i===item.workflow.length-1?"✓":"→")+'</span></div>').join("");
+setText("workflowCount",(item.workflow||[]).length+" mapped workflow stages");
+fillList("functionTasks",item.tasks);
+fillList("functionAssisted",item.assisted);
+fillList("functionInputs",item.inputs);
+fillList("functionRecords",item.records);
+fillList("functionHuman",item.human);
+const method=document.getElementById("functionMethod");
+if(method)method.innerHTML=(item.method||[]).map((v,i)=>'<article><span>'+String(i+1).padStart(2,"0")+'</span><div><strong>'+esc(["Understand","Design","Connect","Test & launch","Review"][i]||"Implement")+'</strong><p>'+esc(v)+'</p></div></article>').join("");
+const outcomes=document.getElementById("functionOutcomes");
+if(outcomes)outcomes.innerHTML=(item.outcomes||[]).map((v,i)=>'<article><span>MEASURE '+String(i+1).padStart(2,"0")+'</span><strong>'+esc(v)+'</strong><small>Baseline and target agreed during discovery</small></article>').join("");
+const insights=document.getElementById("functionInsightCards");
+if(insights)insights.innerHTML='<article><span>↗</span><div><small>WORKFLOW STAGES</small><strong>'+item.workflow.length+'</strong></div></article><article><span>⚙</span><div><small>AUTOMATABLE TASKS</small><strong>'+item.tasks.length+'</strong></div></article><article><span>✦</span><div><small>AI-ASSISTED ACTIVITIES</small><strong>'+item.assisted.length+'</strong></div></article><article><span>✓</span><div><small>HUMAN CONTROL POINTS</small><strong>'+item.human.length+'</strong></div></article>';
+const chart=document.getElementById("functionChartBars");
+if(chart)chart.innerHTML=(item.outcomes||[]).slice(0,4).map((v,i)=>'<div class="function-chart-row"><span>'+esc(v)+'</span><div><i style="width:0%"></i></div><b>Set with you</b></div>').join("");
 const year=document.getElementById("year");if(year)year.textContent=new Date().getFullYear();
 const toggle=document.getElementById("functionMenuToggle"),nav=document.querySelector(".function-page .nav");
 if(toggle&&nav){toggle.addEventListener("click",()=>{const open=nav.classList.toggle("open");toggle.setAttribute("aria-expanded",String(open));toggle.setAttribute("aria-label",open?"Close navigation":"Open navigation");});nav.querySelectorAll("a").forEach(a=>a.addEventListener("click",()=>{nav.classList.remove("open");toggle.setAttribute("aria-expanded","false");}));}
