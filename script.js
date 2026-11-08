@@ -272,6 +272,13 @@ function renderBusinessComparison(report) {
     '<section class="report-section report-our-recommendations"><h3>2. What we recommend</h3><p class="report-chart-intro">Our recommendations are based on the operational challenges and goals in your answers, not simply on the functions selected.</p>'+recommendedBlock+'</section>'+
     '<section class="report-section report-opportunities"><h3>3. Opportunities we identified</h3><p class="report-chart-intro">Potential ways to improve performance once the core workflows are working reliably.</p>'+renderReportItems(additional,'No additional growth opportunities stood out from the information provided.')+'</section>';
 }
+function calculateBusinessProposal(report) {
+  const count=(report.recommendedFunctions||[]).length;
+  const individualSetup=count*200;
+  const individualMonthly=count*20;
+  const recommendBundle=count>=6;
+  return {count,individualSetup,individualMonthly,setup:recommendBundle?1000:individualSetup,monthly:recommendBundle?100:individualMonthly,totalFirstYear:(recommendBundle?1000:individualSetup)+(recommendBundle?100:individualMonthly)*12,recommendBundle};
+}
 function renderBusinessPricing(report) {
   const p=calculateBusinessProposal(report);
   const focusedSetup=p.individualSetup||0;
