@@ -113,7 +113,7 @@ function renderQuestion() {
     '<div class="assessment-progress"><span style="width:'+Math.round(((currentStep+1)/total)*100)+'%"></span></div>'+
     '<section class="assessment-question"><h3>'+escapeHtml(q.title)+'</h3>'+(q.hint?'<p>'+escapeHtml(q.hint)+'</p>':'')+controlMarkup(q)+'</section>'+
     '<div class="assessment-error" id="assessmentError" role="alert"></div>'+
-    '<div class="assessment-actions">'+(currentStep>0?'<button class="assessment-back" type="button" id="assessmentBack">Back</button>':'<span class="assessment-privacy">Your answers stay in this browser in this first version.</span>')+
+    '<div class="assessment-actions">'+(currentStep>0?'<button class="assessment-back" type="button" id="assessmentBack">Back</button>':'<span class="assessment-privacy">Your answers are processed in this browser and are not saved or sent anywhere.</span>')+
     '<button class="button button-primary" type="button" id="assessmentNext">'+(currentStep===total-1?'Generate my report':'Continue')+' <span>→</span></button></div>';
   document.getElementById('assessmentNext').addEventListener('click', () => {
     if (!saveCurrentAnswer()) {
@@ -175,7 +175,7 @@ function buildBusinessReport() {
   if (rate && hours) {
     const moneyLow = Math.round(annualLow*rate).toLocaleString();
     const moneyHigh = Math.round(annualHigh*rate).toLocaleString();
-    highlight = moneyLow+'–'+moneyHigh+' '+(Intl.NumberFormat().resolvedOptions().currency||'')+' / year';
+    highlight = moneyLow+'–'+moneyHigh+' local currency units / year';
     note = 'Indicative labour-capacity value using your hourly cost and a 20–30% reduction assumption. This is not a guaranteed cash saving.';
   }
   return {
