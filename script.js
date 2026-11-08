@@ -155,7 +155,7 @@ function loadPdfLibrary() {
   return pdfLibraryPromise;
 }
 function safePdfText(value,max=900) {
-  const text=String(value??'').replace(/\s+/g,' ').trim();
+  const text=String(value??'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
   if (text.length<=max) return text;
   return text.slice(0,Math.max(0,max-1)).trimEnd()+'…';
 }
