@@ -139,7 +139,7 @@ function renderQuestion() {
   document.getElementById('assessmentBack')?.addEventListener('click', () => { saveCurrentAnswer(); currentStep--; renderQuestion(); });
 }
 function renderDownloadReportSection() {
-  return '<section class="report-download-section"><div><span class="report-download-kicker"><span>DONNINGER.AI</span><span class="report-kicker-separator">·</span><span>YOUR REPORT</span></span><h3>Your report is ready</h3><p>Download a professionally formatted PDF with a consistent four-page layout.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Download PDF <span>↓</span></button></section>';
+  return '<section class="report-download-section"><div><span class="report-download-kicker"><span>DONNINGER.AI</span><span class="report-kicker-separator">·</span><span>YOUR REPORT</span></span><h3>Your report is ready</h3><p>Download a professionally formatted PDF with a consistent four-page layout.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Download PDF <span>↓</span></button></section><section class="report-email-section"><div><h3>Email your report</h3><p>Enter your email address and we will send you a copy of your assessment as a PDF attachment.</p></div><form id="emailReportForm"><label for="reportEmailAddress">Email address</label><input id="reportEmailAddress" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@example.com"><button class="button button-primary" type="submit" id="emailReportButton">Email me my report <span>→</span></button><p class="report-email-status" id="reportEmailStatus" role="status" aria-live="polite"></p></form></section>';
 }
 let pdfLibraryPromise;
 function loadPdfLibrary() {
@@ -455,12 +455,22 @@ async function createAssessmentPdf(report,isBusiness) {
     sourcePage.cleanup();
   }
   const bytes=await flattened.save();
-  const blob=new Blob([bytes],{type:'application/pdf'});
+  return new Blob([bytes],{type:'application/pdf'});
+}
+function downloadAssessmentPdf(blob,report) {
   const url=URL.createObjectURL(blob);
   const link=document.createElement('a');
   link.href=url; link.download=pdfFilename(report);
   document.body.appendChild(link); link.click(); link.remove();
   setTimeout(()=>URL.revokeObjectURL(url),1500);
+}
+async function pdfBlobToBase64(blob) {
+  const bytes=new Uint8Array(await blob.arrayBuffer());
+  let binary='';
+  for(let offset=0;offset<bytes.length;offset+=0x8000) {
+    binary+=String.fromCharCode(...bytes.subarray(offset,Math.min(offset+0x8000,bytes.length)));
+  }
+  return btoa(binary);
 }
 function bindDownloadReport() {
   const buttons=[document.getElementById('downloadReportPdf'),document.getElementById('assessmentPrint')].filter(Boolean);
@@ -469,10 +479,48 @@ function bindDownloadReport() {
     const isBusiness=activeAssessment===assessments.business;
     const original=button.innerHTML;
     button.disabled=true; button.textContent='Preparing your PDF…';
-    try { await createAssessmentPdf(report,isBusiness); button.textContent='PDF downloaded'; }
+    try {
+      const blob=await createAssessmentPdf(report,isBusiness);
+      downloadAssessmentPdf(blob,report);
+      button.textContent='PDF downloaded';
+    }
     catch(error) { console.error(error); button.textContent='Download failed'; window.alert(error.message||'The PDF could not be created. Please try again.'); }
     finally { setTimeout(()=>{button.disabled=false;button.innerHTML=original;},1800); }
   }));
+  const form=document.getElementById('emailReportForm');
+  form?.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const emailInput=document.getElementById('reportEmailAddress');
+    const button=document.getElementById('emailReportButton');
+    const status=document.getElementById('reportEmailStatus');
+    if(!emailInput.reportValidity()) return;
+    const report=activeAssessment===assessments.business?buildBusinessReport():buildFounderReport();
+    const isBusiness=activeAssessment===assessments.business;
+    const original=button.innerHTML;
+    button.disabled=true; button.textContent='Preparing and sending…';
+    status.textContent='Preparing your PDF report…';
+    status.className='report-email-status';
+    try {
+      const blob=await createAssessmentPdf(report,isBusiness);
+      const pdfBase64=await pdfBlobToBase64(blob);
+      status.textContent='Sending your report…';
+      const response=await fetch('/api/reports/send',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:emailInput.value.trim(),pdfBase64,filename:pdfFilename(report),businessName:report.clientName||answers.idea||'your business'})
+      });
+      const result=await response.json();
+      if(!response.ok||!result.success) throw new Error(result.error||'The report could not be sent.');
+      status.textContent='Your report has been sent. Please check your inbox.';
+      status.classList.add('is-success');
+    } catch(error) {
+      console.error(error);
+      status.textContent=error.message||'The report could not be sent. Please try again.';
+      status.classList.add('is-error');
+    } finally {
+      button.disabled=false; button.innerHTML=original;
+    }
+  });
 }
 function renderReport() {
   const isBusiness = activeAssessment === assessments.business;
