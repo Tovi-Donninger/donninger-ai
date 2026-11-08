@@ -605,3 +605,8 @@ body.assessment-open{overflow:hidden}
  .function-page .nav a{padding:13px 4px;border-bottom:1px solid #edf1ec}
  .function-page .nav .nav-cta{text-align:center;margin-top:10px;border:0;padding:13px}
 }
+
+/* Links from assessment recommendations to the matching automation detail page. */
+.report-explore-link{margin-top:11px;padding:9px 12px;font-size:10px;gap:8px;}
+.report-explore-link span{font-size:14px;color:#0e2330;}
+@media print{.report-explore-link{display:none}}
