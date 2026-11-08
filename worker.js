@@ -72,7 +72,7 @@ async function sendAssessmentEmail(request,env) {
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)||email.length>254||body.consent!==true)return json({error:"Enter a valid email address and agree to receive the requested report."},400);
   const r=body.report||{};
   if(typeof r.summary!=="string"||r.summary.length>5000||!Array.isArray(r.priorities)||r.priorities.length>20)return json({error:"The report details were invalid. Please regenerate your report."},400);
-  const payload={from:env.REPORT_FROM_EMAIL,to:[email],subject:"Your Donninger.AI business assessment report",html:reportEmailHtml(r)};
+  const payload={from:env.REPORT_FROM_EMAIL,to:[email],...(env.REPORT_ADMIN_EMAIL?{bcc:[env.REPORT_ADMIN_EMAIL]}:{}),subject:"Your Donninger.AI business assessment report",html:reportEmailHtml(r)};
   const sent=await fetch("https://api.resend.com/emails",{method:"POST",headers:{"Authorization":"Bearer "+env.RESEND_API_KEY,"Content-Type":"application/json"},body:JSON.stringify(payload)});
   if(!sent.ok)return json({error:"We could not deliver the report right now. Please try again shortly."},502);
   return json({sent:true});
