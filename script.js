@@ -263,21 +263,10 @@ function buildGrowthOpportunities(goal,functions) {
   return ideas.slice(0,3);
 }
 function renderBusinessVisuals(report) {
-  const chart = report.chart;
-  if (!chart || !chart.items.length) return '';
-  const stops = chart.items.map(item=>item.colour+' '+item.start+'% '+item.end+'%').join(',');
-  const bars = chart.items.map(item=>{
-    const value = item.hoursHigh ? Math.round(item.hoursHigh) : 0;
-    const width = report.chart.items.reduce((max,x)=>Math.max(max,x.hoursHigh),0);
-    const pct = width ? Math.max(4,value/width*100) : 0;
-    const valueText = chart.items.length && Number(answers.hourlyCost||0)
-      ? escapeHtml(new Intl.NumberFormat(undefined,{style:'currency',currency:chart.currency,maximumFractionDigits:0}).format(item.valueLow))+'–'+escapeHtml(new Intl.NumberFormat(undefined,{style:'currency',currency:chart.currency,maximumFractionDigits:0}).format(item.valueHigh))
-      : item.hoursLow+'–'+item.hoursHigh+' hrs';
-    return '<div class="report-bar-row"><div class="report-bar-label"><span>'+escapeHtml(item.name)+'</span><strong>'+valueText+'</strong></div><div class="report-bar-track"><i style="width:'+pct+'%;background:'+item.colour+'"></i></div></div>';
-  }).join('');
-  const legend = chart.items.map(item=>'<div class="report-legend-item"><i style="background:'+item.colour+'"></i><span>'+escapeHtml(item.name)+' <b>'+Math.round(item.share*100)+'%</b></span></div>').join('');
+  const items = (report.chart && report.chart.items) || [];
+  const workflows = items.map((item,i)=>'<article class="growth-card"><span>AREA 0'+(i+1)+'</span><strong>'+escapeHtml(item.name)+'</strong><p>'+escapeHtml(item.task)+'.</p></article>').join('');
   const growth = report.growth.map((item,i)=>'<article class="growth-card"><span>GROWTH '+(i+1)+'</span><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></article>').join('');
-  return '<section class="report-section"><h3>Where automation could release capacity</h3><p class="report-chart-intro">Illustrative allocation of the potential time opportunity across the business functions you selected. It is a planning model, not measured departmental waste.</p><div class="report-chart-grid"><article class="report-chart-card"><div class="report-chart-heading"><strong>Opportunity by function</strong><small>Share of estimated opportunity</small></div><div class="report-donut-wrap"><div class="report-donut" style="background:conic-gradient('+stops+')"><span>Potential<br>capacity</span></div><div class="report-legend">'+legend+'</div></div></article><article class="report-chart-card"><div class="report-chart-heading"><strong>Estimated annual capacity</strong><small>'+(Number(answers.hourlyCost||0)?'Indicative labour value':'Hours potentially reclaimed')+'</small></div><div class="report-bars">'+bars+'</div></article></div></section><section class="report-section"><h3>Where the business could grow</h3><p class="report-chart-intro">These are growth levers to investigate after improving the underlying workflows.</p><div class="growth-grid">'+growth+'</div></section>';
+  return (workflows?'<section class="report-section"><h3>Where we would focus first</h3><p class="report-chart-intro">These are the business areas you selected, with practical workflows to review during scoping. We will confirm which steps can be automated and which require a person’s approval.</p><div class="growth-grid">'+workflows+'</div></section>':'')+'<section class="report-section"><h3>Where the business could grow</h3><p class="report-chart-intro">These are growth levers to investigate after improving the underlying workflows.</p><div class="growth-grid">'+growth+'</div></section>';
 }
 function buildFounderReport() {
   const stage = answers.stage || 'Just an idea';
