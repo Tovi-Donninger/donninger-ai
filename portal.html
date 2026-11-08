@@ -16,12 +16,16 @@
       <div class="login-kicker">SECURE CLIENT WORKSPACE</div>
       <h1>Good to have<br><span>you back.</span></h1>
       <p class="login-copy">Sign in to access your business dashboard, automation systems and progress reports.</p>
-      <div class="login-form">
-        <div class="preview-access"><strong>Administrator preview</strong><span>Development access · all eight business functions</span></div>
-        <button id="enterPreview" class="portal-button portal-button-primary" type="button">Enter development workspace <span>→</span></button>
-      </div>
+      <form id="loginForm" class="login-form">
+        <label for="loginEmail">Email address</label>
+        <input id="loginEmail" name="email" type="email" autocomplete="username" placeholder="admin@donninger.ai" required>
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" name="password" type="password" autocomplete="current-password" placeholder="Enter development password" required>
+        <p id="loginError" class="login-error" role="alert"></p>
+        <button class="portal-button portal-button-primary" type="submit">Sign in <span>→</span></button>
+      </form>
       <div class="login-foot"><span>←</span> <a href="index.html">Back to Donninger.AI</a></div>
-      <div class="demo-notice"><strong>Development preview</strong><br>This temporary preview entry is for development only and is not protected by a password. Do not enter real customer or sensitive business information. Server-side authentication and paid-access controls must be connected before launch.</div>
+      <div class="demo-notice"><strong>Development preview</strong><br>Development administrator access is temporary. Do not enter real customer or sensitive business information. Customer registration, subscription verification and paid-access controls will be added separately.</div>
     </section>
     <aside class="login-visual">
       <div class="visual-orbit orbit-a"></div><div class="visual-orbit orbit-b"></div>
