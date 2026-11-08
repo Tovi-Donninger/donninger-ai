@@ -194,7 +194,11 @@ const P={
       "The system extracts details, creates candidate profiles and organises documents.",
       "AI compares documented evidence with stated criteria and prepares shortlist recommendations.",
       "A recruiter reviews candidates, selects who progresses and arranges phone screens or interviews.",
-      "After a hire is confirmed, verified information moves into a controlled onboarding checklist."
+      "After a hire is confirmed, verified information moves into a controlled onboarding checklist.",
+      "When onboarding is completed, the system creates an individual employee file and adds the employee to the central employee database.",
+      "Approved employee details are synchronised with the connected finance and payroll platform, with changes routed through the required approvals.",
+      "The manager sets role-specific KPIs, targets and assessment criteria linked to the employee's file.",
+      "At agreed review points, managers record results, feedback and supporting performance documentation in the employee's employment history."
     ],
     "tasks": [
       "Generate draft job descriptions, adverts and platform-specific versions.",
@@ -206,14 +210,27 @@ const P={
       "Detect duplicate applications and organise supporting documents.",
       "Track application stages, interview dates, feedback and outstanding actions.",
       "Schedule interviews and send calendar invitations when availability is connected.",
-      "Prepare onboarding checklists, document requests, induction tasks and reminders for a confirmed hire."
+      "Prepare onboarding checklists, document requests, induction tasks and reminders for a confirmed hire.",
+      "Create a structured digital employee file containing verified personal, contact, role, contract and onboarding information.",
+      "Maintain a searchable central employee database with role, department, manager, start date and employment status.",
+      "Store employment contracts, policy acknowledgements, approved documents, training records and relevant employment changes with access controls.",
+      "Synchronise approved employee and payroll changes with the connected finance platform, including salary, pay frequency, working hours, allowances and employment status.",
+      "Route payroll changes, bank-detail changes, bonuses, deductions and leave adjustments to authorised approvers before they are sent to payroll.",
+      "Generate role-specific employee KPIs and measurable targets based on the job description and company objectives.",
+      "Create assessment criteria, competency frameworks and review schedules linked to each employee file.",
+      "Collect manager assessment results, employee comments, goal progress and agreed development actions.",
+      "Store dated performance reviews, supporting documents, recognition, training completion and performance improvement plans.",
+      "Maintain an auditable history of changes to employee records, KPI targets, assessments and payroll-related data."
     ],
     "assisted": [
       "Compare candidate experience and qualifications with stated job criteria.",
       "Prepare evidence-based candidate summaries, strengths and missing information.",
       "Create shortlist recommendations with reasons linked to job requirements.",
       "Prepare phone-screening questions and interview packs.",
-      "Summarise interviewer feedback and identify missing onboarding information."
+      "Summarise interviewer feedback and identify missing onboarding information.",
+      "Suggest measurable KPIs and role-specific assessment criteria for manager approval.",
+      "Prepare performance review forms, progress summaries and development-plan drafts.",
+      "Compare recorded results with agreed targets and highlight trends or areas needing discussion, without making employment decisions."
     ],
     "records": [
       "Candidate name and contact details supplied in the application.",
@@ -221,28 +238,43 @@ const P={
       "Vacancy, application date, source and recruitment stage.",
       "Screening evidence, recruiter notes and interview feedback.",
       "Candidate consent and retention/deletion status.",
-      "For a hire: verified personal details, approved documents and onboarding status."
+      "For each employee: verified personal and contact details, job title, department, manager, start date, employment status and work location.",
+      "Employment agreement, approved amendments, required employee documents, policy acknowledgements and training records.",
+      "Payroll-relevant details and change history, with sensitive bank and compensation data restricted to authorised users.",
+      "KPI definitions, targets, measurement periods, assessment criteria and the person responsible for each review.",
+      "Performance results, manager assessments, employee comments, achievements, feedback and supporting evidence.",
+      "Performance review history, development objectives, training plans and documented improvement actions.",
+      "Approval records and audit history for employee-file, assessment and payroll changes."
     ],
     "human": [
       "A recruiter reviews comparisons and decides who progresses; AI does not autonomously reject or hire.",
       "Hiring managers conduct interviews and make selection decisions using job-related criteria.",
       "People verify identity, qualifications, references and employment details.",
-      "Authorised staff approve offers, contracts, payroll details and employee-system access.",
-      "The employer controls retention, candidate permissions and access to sensitive HR records."
+      "Authorised staff approve offers, contracts, employee-file creation, payroll details and employee-system access.",
+      "Managers define and approve fair, role-relevant KPIs and assessment criteria; employees should be able to understand the measures used to assess them.",
+      "Managers conduct performance conversations, verify evidence and approve review outcomes; AI provides preparation and analysis rather than making disciplinary, promotion or termination decisions.",
+      "Payroll and finance staff verify changes and approve payroll submissions, salary changes, deductions and bank-detail updates.",
+      "The employer controls access, retention, correction rights and secure handling of sensitive employee and performance records."
     ],
     "method": [
       "Map the vacancy-to-hire journey and identify bottlenecks.",
       "Agree job-related criteria, templates, data fields, permissions and retention rules.",
-      "Configure application inbox, CV extraction, candidate tracker and integrations.",
-      "Test extraction, screening explanations, duplicates and human approval steps.",
-      "Measure time to shortlist, candidate response times and onboarding completion."
+      "Configure the application inbox, CV extraction, candidate tracker and recruitment integrations.",
+      "Design the employee-file structure, central employee database fields, access permissions and document-retention rules.",
+      "Map approved employee data fields to the finance and payroll platform; define which system is the source of truth for each field.",
+      "Set payroll approval controls and test synchronisation for new hires and employee changes before live payroll use.",
+      "Define role-based KPIs, measurable targets, assessment criteria, review periods and employee/manager workflows.",
+      "Test employee-file creation, data access, payroll changes, review records and audit history.",
+      "Measure recruitment time, onboarding completion, employee-record accuracy, payroll correction rates and completion of performance reviews."
     ],
-    "oversight": "Recruitment data is sensitive. Candidate assessments must be explainable, based on job-related evidence and reviewed by people. The system must not infer protected characteristics or make final hiring decisions. Job-board publishing depends on platform permissions. Employee records use verified information and appropriate privacy and retention controls.",
+    "oversight": "Recruitment and employee records contain sensitive personal information. Candidate assessments must be explainable, based on job-related evidence and reviewed by people; AI must not make final hiring, disciplinary, promotion or termination decisions. Employee-file creation and payroll synchronisation use verified information, role-based access, audit logs and appropriate privacy and retention controls. Payroll changes, bank details, salary changes and payroll submissions require authorised approval. KPIs and assessments must be transparent, relevant to the employee's role and reviewed by managers. Job-board publishing and finance/payroll integrations depend on platform permissions and supported APIs.",
     "outcomes": [
       "Less recruitment administration",
       "Faster application organisation",
       "Consistent candidate briefings",
-      "More structured onboarding"
+      "Connected employee records and payroll administration",
+      "Structured KPIs and documented performance reviews",
+      "More consistent onboarding and employee lifecycle management"
     ]
   },
   "finance": {
