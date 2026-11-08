@@ -180,12 +180,25 @@ function pdfWinAnsiText(value) {
     .replace(/[–—]/g,'-')
     .replace(/[…]/g,'...')
     .replace(/[•·]/g,'-')
-    .replace(/[^\x20-\x7E\n]/g,' ')
+    .replace(/[^\x20-\x7E]/g,' ')
     .replace(/[ \t]+/g,' ')
     .trim();
 }
 function safePdfText(value,max=900) {
-  const text=pdfWinAnsiText(value).replace(/\r/g,'').replace(/\n{3,}/g,'\n\n').trim();
+  const text=String(value??'')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[’‘]/g,"'")
+    .replace(/[“”]/g,'"')
+    .replace(/[–—]/g,'-')
+    .replace(/[…]/g,'...')
+    .replace(/[•·]/g,'-')
+    .replace(/\r/g,'')
+    .split('\n')
+    .map(line=>pdfWinAnsiText(line))
+    .join('\n')
+    .replace(/\n{3,}/g,'\n\n')
+    .trim();
   if (text.length<=max) return text;
   return text.slice(0,Math.max(0,max-3)).trimEnd()+'...';
 }
@@ -224,8 +237,8 @@ async function createAssessmentPdf(report,isBusiness) {
     const maxWidth=width-padding*2;
     const lineHeight=size*1.42;
     const lines=[];
-    String(raw).split(/\\n/).forEach(paragraph=>{
-      const words=paragraph.split(/\\s+/).filter(Boolean);
+    String(raw).split(/\n/).forEach(paragraph=>{
+      const words=paragraph.split(/\s+/).filter(Boolean);
       if(!words.length){lines.push('');return;}
       let lineText='';
       words.forEach(word=>{
