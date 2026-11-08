@@ -199,8 +199,8 @@ function automationSlugForRecommendation(label) {
   if (/human resources|\bhr\b|recruit|employee|onboarding|staff administration/.test(value)) return 'hr-recruitment';
   if (/finance|accounting|budget|invoice|payment/.test(value)) return 'finance';
   if (/stock|supplier|logistics|order|delivery|fulfilment/.test(value)) return 'stock-logistics';
-  if (/management|report|kpi|performance dashboard|business intelligence/.test(value)) return 'management';
   if (/operations|administration|workflow|business process|technology|website/.test(value)) return 'operations';
+  if (/management|report|kpi|performance dashboard|business intelligence|strategy|growth plan/.test(value)) return 'management';
   return null;
 }
 function renderAutomationLink(label) {
