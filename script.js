@@ -139,7 +139,7 @@ function renderQuestion() {
   document.getElementById('assessmentBack')?.addEventListener('click', () => { saveCurrentAnswer(); currentStep--; renderQuestion(); });
 }
 function renderDownloadReportSection() {
-  return '<section class="report-download-section"><div><span class="assessment-kicker">DONNINGER.AI · YOUR REPORT</span><h3>Your report is ready</h3><p>Save a PDF copy of your assessment and recommendations.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Save report as PDF <span>↓</span></button></section>';
+  return '<section class="report-download-section"><div><span class="report-download-kicker"><span>DONNINGER.AI</span><span class="report-kicker-separator">·</span><span>YOUR REPORT</span></span><h3>Your report is ready</h3><p>Save a PDF copy of your assessment and recommendations.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Save report as PDF <span>↓</span></button></section>';
 }
 function bindDownloadReport() {
   document.getElementById('downloadReportPdf')?.addEventListener('click',()=>window.print());
