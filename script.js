@@ -171,10 +171,23 @@ function loadPdfJs() {
   });
   return pdfJsPromise;
 }
+function pdfWinAnsiText(value) {
+  return String(value??'')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[’‘]/g,"'")
+    .replace(/[“”]/g,'"')
+    .replace(/[–—]/g,'-')
+    .replace(/[…]/g,'...')
+    .replace(/[•·]/g,'-')
+    .replace(/[^\x20-\x7E\n]/g,' ')
+    .replace(/[ \t]+/g,' ')
+    .trim();
+}
 function safePdfText(value,max=900) {
-  const text=String(value??'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
+  const text=pdfWinAnsiText(value).replace(/\r/g,'').replace(/\n{3,}/g,'\n\n').trim();
   if (text.length<=max) return text;
-  return text.slice(0,Math.max(0,max-1)).trimEnd()+'…';
+  return text.slice(0,Math.max(0,max-3)).trimEnd()+'...';
 }
 function pdfFilename(report) {
   const base=(report.clientName||report.title||'Donninger-AI-Assessment').toString()
@@ -193,13 +206,13 @@ async function createAssessmentPdf(report,isBusiness) {
   const W=595.28,H=841.89,LEFT=48,RIGHT=547,CONTENT=499;
   const ink=rgb(.12,.22,.32),muted=rgb(.39,.47,.55),teal=rgb(.10,.52,.48),pale=rgb(.94,.97,.98),line=rgb(.85,.89,.92),white=rgb(1,1,1);
   const drawText=(page,text,x,top,size=9,font=regular,color=ink)=>{
-    page.drawText(String(text??''),{x,y:H-top-size,size,font,color,maxWidth:CONTENT});
+    page.drawText(pdfWinAnsiText(text),{x,y:H-top-size,size,font,color,maxWidth:CONTENT});
   };
   const rect=(page,x,top,width,height,fill=pale,border=line)=>{
     page.drawRectangle({x,y:H-top-height,width,height,color:fill,borderColor:border,borderWidth:.7});
   };
   const heading=(page,text,top)=>{
-    page.drawText(text,{x:LEFT,y:H-top-17,size:15,font:bold,color:ink});
+    page.drawText(pdfWinAnsiText(text),{x:LEFT,y:H-top-17,size:15,font:bold,color:ink});
     page.drawRectangle({x:LEFT,y:H-top-23,width:CONTENT,height:1,color:line});
   };
   const addField=(page,name,value,x,top,width,height,opts={})=>{
@@ -227,8 +240,8 @@ async function createAssessmentPdf(report,isBusiness) {
     const visible=lines.slice(0,maxLines);
     if(lines.length>maxLines&&visible.length){
       let last=visible[visible.length-1];
-      while(last.length>1&&font.widthOfTextAtSize(last+'…',size)>maxWidth) last=last.slice(0,-1);
-      visible[visible.length-1]=last+'…';
+      while(last.length>1&&font.widthOfTextAtSize(last+'...',size)>maxWidth) last=last.slice(0,-1);
+      visible[visible.length-1]=last+'...';
     }
     page.drawRectangle({x,y:H-top-height,width,height,color:white,borderColor:line,borderWidth:.65});
     visible.forEach((lineText,i)=>{
@@ -236,7 +249,7 @@ async function createAssessmentPdf(report,isBusiness) {
     });
   };
   const addLabel=(page,label,x,top)=>{
-    page.drawText(label.toUpperCase(),{x,y:H-top-7,size:7,font:bold,color:muted});
+    page.drawText(pdfWinAnsiText(label.toUpperCase()),{x,y:H-top-7,size:7,font:bold,color:muted});
   };
   const addHeader=(page,section,pageNo)=>{
     page.drawRectangle({x:0,y:H-9,width:W,height:9,color:teal});
@@ -245,9 +258,9 @@ async function createAssessmentPdf(report,isBusiness) {
     page.drawText('BUSINESS AUTOMATION & GROWTH',{x:LEFT+34,y:H-47,size:6,font:regular,color:muted});
     page.drawText('CONFIDENTIAL ASSESSMENT',{x:405,y:H-38,size:6,font:bold,color:muted});
     page.drawRectangle({x:LEFT,y:H-60,width:CONTENT,height:1.2,color:ink});
-    page.drawText(section.toUpperCase(),{x:LEFT,y:H-78,size:7,font:bold,color:teal,characterSpacing:.7});
+    page.drawText(pdfWinAnsiText(section.toUpperCase()),{x:LEFT,y:H-78,size:7,font:bold,color:teal,characterSpacing:.7});
     page.drawRectangle({x:LEFT,y:35,width:CONTENT,height:.7,color:line});
-    page.drawText('DONNINGER.AI  ·  CONFIDENTIAL',{x:LEFT,y:21,size:6,font:bold,color:muted});
+    page.drawText('DONNINGER.AI  -  CONFIDENTIAL',{x:LEFT,y:21,size:6,font:bold,color:muted});
     page.drawText('PAGE '+pageNo+' OF 4',{x:500,y:21,size:6,font:bold,color:muted});
   };
   const addPage=(section,pageNo)=>{
