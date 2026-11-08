@@ -243,7 +243,7 @@ async function createAssessmentPdf(report,isBusiness) {
       let lineText='';
       words.forEach(word=>{
         const candidate=lineText?lineText+' '+word:word;
-        if(font.widthOfTextAtSize(candidate,size)<=maxWidth){lineText=candidate;return;}
+        if(font.widthOfTextAtSize(pdfWinAnsiText(candidate),size)<=maxWidth){lineText=candidate;return;}
         if(lineText) lines.push(lineText);
         lineText=word;
       });
@@ -253,12 +253,12 @@ async function createAssessmentPdf(report,isBusiness) {
     const visible=lines.slice(0,maxLines);
     if(lines.length>maxLines&&visible.length){
       let last=visible[visible.length-1];
-      while(last.length>1&&font.widthOfTextAtSize(last+'...',size)>maxWidth) last=last.slice(0,-1);
+      while(last.length>1&&font.widthOfTextAtSize(pdfWinAnsiText(last+'...'),size)>maxWidth) last=last.slice(0,-1);
       visible[visible.length-1]=last+'...';
     }
     page.drawRectangle({x,y:H-top-height,width,height,color:white,borderColor:line,borderWidth:.65});
     visible.forEach((lineText,i)=>{
-      if(lineText) page.drawText(lineText,{x:x+padding,y:H-top-padding-size-i*lineHeight,size,font,color:opts.color||ink});
+      if(lineText) page.drawText(pdfWinAnsiText(lineText),{x:x+padding,y:H-top-padding-size-i*lineHeight,size,font,color:opts.color||ink});
     });
   };
   const addLabel=(page,label,x,top)=>{
@@ -435,9 +435,9 @@ async function createAssessmentPdf(report,isBusiness) {
   const pdfjs=await loadPdfJs();
   const source=await pdfjs.getDocument({data:sourceBytes}).promise;
   const flattened=await PDFDocument.create();
-  flattened.setTitle((report.title||'Donninger.AI Assessment')+' | Donninger.AI');
-  flattened.setAuthor('Donninger.AI');
-  flattened.setSubject('Static, flattened Donninger.AI assessment report');
+  flattened.setTitle(pdfWinAnsiText((report.title||'Donninger.AI Assessment')+' | Donninger.AI'));
+  flattened.setAuthor(pdfWinAnsiText('Donninger.AI'));
+  flattened.setSubject(pdfWinAnsiText('Static, flattened Donninger.AI assessment report'));
   for(let pageNumber=1;pageNumber<=source.numPages;pageNumber++){
     const sourcePage=await source.getPage(pageNumber);
     const viewport=sourcePage.getViewport({scale:2});
