@@ -84,3 +84,14 @@ document.getElementById('functionTasks').innerHTML = item.tasks.map(task=>'<li>'
 document.getElementById('functionMethod').innerHTML = item.method.map(step=>'<li>'+escapeText(step)+'</li>').join('');
 document.getElementById('functionOutcomes').innerHTML = item.outcomes.map((outcome,index)=>'<article><span>0'+(index+1)+'</span><strong>'+escapeText(outcome)+'</strong></article>').join('');
 document.getElementById('year').textContent = new Date().getFullYear();
+const functionMenuToggle = document.getElementById('functionMenuToggle');
+const functionNav = document.querySelector('.function-page .nav');
+functionMenuToggle.addEventListener('click',()=>{
+  const isOpen = functionNav.classList.toggle('open');
+  functionMenuToggle.setAttribute('aria-expanded',String(isOpen));
+  functionMenuToggle.setAttribute('aria-label',isOpen?'Close navigation':'Open navigation');
+});
+functionNav.querySelectorAll('a').forEach(link=>link.addEventListener('click',()=>{
+  functionNav.classList.remove('open');
+  functionMenuToggle.setAttribute('aria-expanded','false');
+}));
