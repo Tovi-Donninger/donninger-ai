@@ -779,3 +779,30 @@ body.assessment-open{overflow:hidden}
  .function-detail-card{padding:21px}
  .function-outcome-grid{grid-template-columns:1fr 1fr}
 }
+
+
+/* Function-page fit section: give card headings clearer rhythm and separation. */
+.function-fit-section .function-section-heading h2 {
+  line-height: 1.34;
+}
+.function-fit-section .function-section-heading h2 span {
+  display: inline-block;
+  margin-top: 5px;
+}
+.function-fit-card h3 {
+  font-size: 15px;
+  line-height: 1.45;
+  letter-spacing: -0.15px;
+  margin: 0 0 12px;
+  max-width: 19ch;
+}
+.function-fit-grid {
+  column-gap: 16px;
+  row-gap: 16px;
+}
+@media (max-width: 700px) {
+  .function-fit-card h3 {
+    max-width: none;
+    line-height: 1.4;
+  }
+}
