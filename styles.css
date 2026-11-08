@@ -918,3 +918,10 @@ body.cart-open{overflow:hidden}
 .report-bundle-prompt .button{font-size:10px;padding:11px 13px}
 .function-pricing-note .button{font-size:10px;padding:9px 12px}
 @media(max-width:640px){.bundle-promo-strip>.container{align-items:flex-start;flex-direction:column;gap:4px;padding-top:9px;padding-bottom:9px}.bundle-promo-strip span strong{display:block;margin:0 0 2px}.report-bundle-prompt{align-items:flex-start;flex-direction:column}.report-bundle-prompt .button{width:100%}}
+
+/* Assessment: customer priorities vs independent recommendations */
+.report-comparison-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:18px 0}
+.report-comparison-summary p{margin:0;padding:16px;border:1px solid rgba(120,160,205,.22);border-radius:14px;background:rgba(120,160,205,.06);line-height:1.55}
+.report-comparison-summary strong{color:var(--text,#f4f7fb)}
+.report-section .report-recommendations article .button{margin:8px 8px 0 0}
+@media(max-width:640px){.report-comparison-summary{grid-template-columns:1fr}.report-section .report-recommendations article .button{width:100%;margin:8px 0 0}}
