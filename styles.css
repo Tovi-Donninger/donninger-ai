@@ -926,21 +926,16 @@ body.cart-open{overflow:hidden}
 .report-section .report-recommendations article .button{margin:8px 8px 0 0}
 @media(max-width:640px){.report-comparison-summary{grid-template-columns:1fr}.report-section .report-recommendations article .button{width:100%;margin:8px 0 0}}
 
-/* Formal assessment report email capture */
-.report-email-section{margin:30px 0;padding:26px;border:1px solid #dce8ec;border-radius:14px;background:linear-gradient(145deg,#f8fbfc,#fff)}
-.report-email-heading h3{font:800 23px/1.25 'Manrope';color:#1b3048;margin:8px 0}
-.report-email-heading>p{font-size:11px;line-height:1.7;color:#718397;max-width:650px;margin:0}
-.email-report-form{display:grid;gap:10px;margin-top:20px}
-.email-report-form>label,.email-report-metrics label{font-size:10px;font-weight:700;color:#40566c}
-.email-report-form input:not([type=checkbox]){width:100%;padding:12px;border:1px solid #dce5eb;border-radius:7px;background:#fff;color:#243b54;font:12px 'DM Sans',sans-serif}
-.email-report-form input:focus{outline:0;border-color:#36b9a7;box-shadow:0 0 0 3px #36b9a71c}
-.email-report-metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:5px}
-.email-report-metrics>div{display:grid;gap:7px}
-.email-report-metrics label span{font-weight:400;color:#8997a4}
-.email-report-note{font-size:9px;line-height:1.6;color:#83919e;margin:2px 0}
-.email-report-consent{display:flex;align-items:flex-start;gap:9px;margin:5px 0}
-.email-report-consent input{margin-top:2px;accent-color:#168f82}
-.email-report-consent span{font-size:9px;line-height:1.6;color:#718397;font-weight:400}
-.email-report-form button{justify-self:start}
-.email-report-status{min-height:18px;margin:0;font-size:10px;color:#168577}
-@media(max-width:600px){.report-email-section{padding:19px}.email-report-metrics{grid-template-columns:1fr}.email-report-form button{width:100%}}
+
+/* Downloadable formal assessment report */
+.report-download-section{margin:30px 0;padding:26px;border:1px solid #dce8ec;border-radius:14px;background:linear-gradient(145deg,#f8fbfc,#fff)}
+.report-savings-analysis{break-inside:avoid}
+.report-savings-table{width:100%;border-collapse:collapse;margin:14px 0;font-size:11px}
+.report-savings-table th,.report-savings-table td{padding:11px;text-align:left;border-bottom:1px solid #e5edf1}
+.report-savings-table th{background:#eff5f7;color:#40566c;font-weight:700}
+.report-savings-table td:last-child,.report-savings-table th:last-child{text-align:right;font-weight:700}
+@media print{
+ .report-download-section,.report-actions{display:none!important}
+ .report-section,.report-highlight,.report-total,.package-card,.growth-card{break-inside:avoid}
+ .report-savings-table{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
