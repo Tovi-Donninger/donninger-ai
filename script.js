@@ -287,7 +287,7 @@ function renderBusinessPricing(report) {
   const bundleYear=1000+100*12;
   const recommendedBundle=!!p.recommendBundle;
   const selectedLabel=p.count+' recommended function(s)';
-  const focusedRow='<tr><td><strong>Focused proposal</strong><small>'+selectedLabel+'</small></td><td>$'+focusedSetup.toLocaleString()+'</td><td>$'+focusedMonthly.toLocaleString()+'</td><td>$'+focusedYear.toLocaleString()+'</td></tr>';
+  const focusedRow=p.count?'<tr><td><strong>Focused proposal</strong><small>'+selectedLabel+'</small></td><td>$'+focusedSetup.toLocaleString()+'</td><td>$'+focusedMonthly.toLocaleString()+'</td><td>$'+focusedYear.toLocaleString()+'</td></tr>':'<tr><td><strong>Focused starting point</strong><small>Pricing applies once a suitable function is confirmed</small></td><td>—</td><td>—</td><td>—</td></tr>';
   const bundleRow='<tr><td><strong>Complete platform</strong><small>All eight functions · best value</small></td><td>$1,000</td><td>$100</td><td>$'+bundleYear.toLocaleString()+'</td></tr>';
   const recommendation=p.count
     ? (recommendedBundle?'Based on the number of functions recommended, the complete platform offers the stronger overall value.':'We recommend starting with the focused proposal. The complete platform remains available if you expect to use the additional functions.')
