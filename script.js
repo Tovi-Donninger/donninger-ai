@@ -236,6 +236,40 @@ function renderFunctionLinks(names,buttonLabel) {
     return '<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>'+escapeHtml(functionDetails[name]?.task || 'Review the recurring workflows and controls in this area')+'.</p>'+(slug?'<a class="button button-primary report-explore-link" href="automation.html?function='+slug+'">'+escapeHtml(buttonLabel)+' <span aria-hidden="true">→</span></a><button type="button" class="button cart-add-button" data-cart-add="'+slug+'">Add to cart</button>':'')+'</div></article>';
   }).join('');
 }
+function renderBusinessMethodology(report) {
+  const operating=answers.functions||[];
+  const requested=report.requestedFunctions||[];
+  const tasks=answers.tasks||[];
+  const company=answers.company?answers.company.trim():'your business';
+  const team=answers.team?(' with a team size of '+answers.team.toLowerCase()):'';
+  const industry=answers.industry?answers.industry.toLowerCase():'the industry you selected';
+  const context=operating.length
+    ? 'You told us that '+company+' operates in '+industry+team+'. The functions currently in place are '+operating.join(', ')+'. This gives us a picture of the business areas that already exist and where workflows may cross between teams.'
+    : 'You told us that '+company+' operates in '+industry+team+'. You did not identify any current business functions, so this report focuses on the activities and priorities you described rather than assuming a department or system is already in place.';
+  const priorities=requested.length
+    ? 'You specifically asked us to consider '+requested.join(', ')+'. '
+    : 'You did not select a specific function to automate. ';
+  const taskText=tasks.length
+    ? 'You also highlighted '+tasks.join(', ').toLowerCase()+'. '
+    : 'You did not identify a particular repetitive task, so the assessment relies more heavily on your stated business goal. ';
+  const goal=answers.goal?answers.goal.toLowerCase():'your wider business priorities';
+  const recommendations=report.recommendedFunctions||[];
+  const decision=recommendations.length
+    ? 'We then compared those signals with your stated goal — '+goal+' — and identified '+recommendations.join(', ')+' as the strongest areas to investigate first. A function is recommended where the task or goal gives us a practical reason to explore it; your selections alone do not automatically determine the recommendation.'
+    : 'Your answers did not provide enough evidence to recommend a specific paid function confidently. Rather than inventing a need, we recommend mapping one repetitive workflow and confirming its volume, tools, owners and approval steps first.';
+  return '<section class="report-section report-methodology"><h3>How we reached these findings</h3><p>'+escapeHtml(context)+'</p><p>'+escapeHtml(priorities+taskText)+'</p><p>'+escapeHtml(decision)+'</p><p class="report-method-note">Assessment approach: your answers are evaluated using a transparent, rules-based set of business workflow indicators. This is an initial opportunity assessment, not an AI-led technical audit or a guarantee of savings.</p></section>';
+}
+function renderFunctionComparisonChart(report) {
+  const operating=answers.functions||[];
+  const requested=report.requestedFunctions||[];
+  const recommended=report.recommendedFunctions||[];
+  const all=['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting'];
+  const rows=all.map(name=>{
+    const current=operating.includes(name), wants=requested.includes(name), rec=recommended.includes(name);
+    return '<div class="function-compare-row"><strong>'+escapeHtml(name)+'</strong><span class="function-compare-status '+(current?'is-active':'')+'">'+(current?'✓ Current':'—')+'</span><span class="function-compare-status '+(wants?'is-wanted':'')+'">'+(wants?'✓ Selected':'—')+'</span><span class="function-compare-status '+(rec?'is-recommended':'')+'">'+(rec?'✓ Recommended':'—')+'</span></div>';
+  }).join('');
+  return '<section class="report-section report-function-comparison"><h3>Business function comparison</h3><p class="report-chart-intro">This overview compares the functions you currently operate, the areas you asked us to automate, and the areas our assessment independently recommends exploring. A dash means that the category was not selected or recommended — it does not mean the business is missing that capability.</p><div class="function-compare-legend"><span><i class="legend-current"></i> Currently operate</span><span><i class="legend-wanted"></i> Want to automate</span><span><i class="legend-recommended"></i> Our recommendation</span></div><div class="function-compare-table"><div class="function-compare-head"><span>Business function</span><span>Current</span><span>Your choice</span><span>Our view</span></div>'+rows+'</div></section>';
+}
 function renderBusinessComparison(report) {
   const requested=report.requestedFunctions||[];
   const recommended=report.recommendedFunctions||[];
@@ -246,8 +280,9 @@ function renderBusinessComparison(report) {
   const recommendedBlock=recommended.length
     ? '<div class="report-recommendations">'+recommended.map((name,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>'+escapeHtml(functionDetails[name]?.task||'Review the current workflow, tools and approval requirements.')+'</p>'+renderAutomationLink(name)+'</div></article>').join('')+'</div>'
     : '<p class="report-field-note">There is not yet enough evidence to recommend a specific function. We suggest mapping one repetitive workflow before selecting a package.</p>';
-  return '<section class="report-section report-customer-wants"><h3>1. What you want</h3><p class="report-chart-intro">The business functions you specifically asked us to consider.</p>'+requestedBlock+'</section>'+
-    '<section class="report-section report-our-recommendations"><h3>2. What we recommend</h3><p class="report-chart-intro">Our recommendations are based on the operational challenges and goals in your answers, not simply on the functions selected.</p>'+recommendedBlock+'</section>'+
+  return renderBusinessMethodology(report)+renderFunctionComparisonChart(report)+
+    '<section class="report-section report-customer-wants"><h3>1. What you want</h3><p class="report-chart-intro">The business functions you specifically asked us to consider.</p>'+requestedBlock+'</section>'+
+    '<section class="report-section report-our-recommendations"><h3>2. What we recommend</h3><p class="report-chart-intro">These recommendations are based on the tasks, current business structure and goal you described — not simply on the functions selected.</p>'+recommendedBlock+'</section>'+
     '<section class="report-section report-opportunities"><h3>3. Opportunities we identified</h3><p class="report-chart-intro">Potential ways to improve performance once the core workflows are working reliably.</p>'+renderReportItems(additional,'No additional growth opportunities stood out from the information provided.')+'</section>';
 }
 function calculateBusinessProposal(report) {
