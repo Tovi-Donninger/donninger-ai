@@ -198,9 +198,9 @@ async function createAssessmentPdf(report,isBusiness) {
   const PDFLib=await loadPdfLibrary();
   const {PDFDocument,StandardFonts,rgb}=PDFLib;
   const pdf=await PDFDocument.create();
-  pdf.setTitle((report.title||'Donninger.AI Assessment')+' | Donninger.AI');
+  pdf.setTitle(pdfWinAnsiText((report.title||'Donninger.AI Assessment')+' | Donninger.AI'));
   pdf.setAuthor('Donninger.AI');
-  pdf.setSubject('Donninger.AI assessment report');
+  pdf.setSubject(pdfWinAnsiText('Donninger.AI assessment report'));
   const regular=await pdf.embedFont(StandardFonts.Helvetica);
   const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
   const W=595.28,H=841.89,LEFT=48,RIGHT=547,CONTENT=499;
@@ -315,13 +315,13 @@ async function createAssessmentPdf(report,isBusiness) {
       const size=i===0?7:6.3;
       const textWidth=bold.widthOfTextAtSize(label,size);
       const x=i===0?colX[i]+9:colX[i]+(colWidths[i]-textWidth)/2;
-      p2.drawText(label,{x,y:H-tableTop-22,size,font:bold,color:white});
+      p2.drawText(pdfWinAnsiText(label),{x,y:H-tableTop-22,size,font:bold,color:white});
     });
     const all=['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting'];
     all.forEach((name,i)=>{
       const top=tableTop+34+i*rowH;
       rect(p2,tableX,top,CONTENT,rowH,i%2?white:pale,line);
-      p2.drawText(name,{x:tableX+9,y:H-top-22,size:7.5,font:bold,color:ink});
+      p2.drawText(pdfWinAnsiText(name),{x:tableX+9,y:H-top-22,size:7.5,font:bold,color:ink});
       const statuses=[
         (answers.functions||[]).includes(name),
         (report.requestedFunctions||[]).includes(name),
@@ -333,7 +333,7 @@ async function createAssessmentPdf(report,isBusiness) {
         const color=active?(j===2?teal:ink):muted;
         if(active) p2.drawRectangle({x:x+14,y:H-(top+9)-18,width:w-28,height:18,color:j===2?rgb(.87,.95,.93):rgb(.91,.94,.96)});
         const tw=bold.widthOfTextAtSize(label,7);
-        p2.drawText(label,{x:x+(w-tw)/2,y:H-top-21,size:7,font:bold,color});
+        p2.drawText(pdfWinAnsiText(label),{x:x+(w-tw)/2,y:H-top-21,size:7,font:bold,color});
       });
     });
     heading(p2,'What you asked us to consider',526);
@@ -370,15 +370,15 @@ async function createAssessmentPdf(report,isBusiness) {
     const tableY=143;
     const headers=[['PACKAGE',LEFT+6],['SETUP',LEFT+260],['MONTHLY',LEFT+330],['FIRST YEAR',LEFT+415]];
     rect(p4,LEFT,tableY,CONTENT,30,ink,ink);
-    headers.forEach(([t,x])=>p4.drawText(t,{x,y:H-tableY-19,size:7,font:bold,color:white}));
+    headers.forEach(([t,x])=>p4.drawText(pdfWinAnsiText(t),{x,y:H-tableY-19,size:7,font:bold,color:white}));
     const priceRows=[
       ['Focused proposal ('+count+' functions)','$'+individualSetup.toLocaleString(),'$'+individualMonthly.toLocaleString(),'$'+(individualSetup+individualMonthly*12).toLocaleString()],
       ['Complete platform (8 functions)','$1,000','$100','$2,200']
     ];
     priceRows.forEach((row,i)=>{
       const top=tableY+30+i*38; rect(p4,LEFT,top,CONTENT,38,i%2?white:pale,line);
-      p4.drawText(row[0],{x:LEFT+6,y:H-top-23,size:7,font:bold,color:ink});
-      row.slice(1).forEach((v,j)=>p4.drawText(v,{x:[LEFT+260,LEFT+330,LEFT+415][j],y:H-top-23,size:7,font:regular,color:ink}));
+      p4.drawText(pdfWinAnsiText(row[0]),{x:LEFT+6,y:H-top-23,size:7,font:bold,color:ink});
+      row.slice(1).forEach((v,j)=>p4.drawText(pdfWinAnsiText(v),{x:[LEFT+260,LEFT+330,LEFT+415][j],y:H-top-23,size:7,font:regular,color:ink}));
     });
     heading(p4,'Assessment recommendation',260);
     addField(p4,'pricing_recommendation',count
