@@ -30,7 +30,8 @@ const assessments = {
       {id:'functions',title:'Which parts of the business do you currently operate?',hint:'Select all that apply.',type:'checks',required:true,options:['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting']},
       {id:'tasks',title:'Where does your team spend too much time on repetitive work?',hint:'Choose any that sound familiar.',type:'checks',options:['Responding to enquiries and following up leads','Preparing quotes, proposals or invoices','Copying information between systems','Scheduling appointments, jobs or staff','Updating spreadsheets and reports','Answering common customer questions','Recruitment, onboarding or staff administration','Chasing payments and overdue accounts','Managing stock, orders or suppliers','We are not sure yet']},
       {id:'hours',title:'Approximately how many team hours are spent on repetitive admin each week?',hint:'A rough estimate is fine. Enter 0 if you are unsure.',type:'number',required:true,min:0,max:10000,placeholder:'e.g. 25'},
-      {id:'hourlyCost',title:'What is the approximate average hourly cost of that time?',hint:'Optional. Include wages and employment costs if known. Enter an amount in your local currency.',type:'number',min:0,max:100000,placeholder:'e.g. 20'},
+      {id:'currency',title:'Which currency should we use in your report?',hint:'Choose the currency you use for staff costs and financial planning.',type:'select',required:true,options:['USD — US Dollar','EUR — Euro','GBP — British Pound','ILS — Israeli New Shekel','ZAR — South African Rand','CAD — Canadian Dollar','AUD — Australian Dollar','NZD — New Zealand Dollar','AED — UAE Dirham','SGD — Singapore Dollar','INR — Indian Rupee','JPY — Japanese Yen','CHF — Swiss Franc','SEK — Swedish Krona','NOK — Norwegian Krone','DKK — Danish Krone','BRL — Brazilian Real','MXN — Mexican Peso']},
+      {id:'hourlyCost',title:'What is the approximate average hourly cost of that time?',hint:'Optional. Enter the amount in the currency you selected.',type:'number',min:0,max:100000,placeholder:'e.g. 20'},
       {id:'goal',title:'What would you most like to improve first?',type:'select',required:true,options:['Win more customers and respond faster','Reduce admin and operating costs','Improve customer experience','Make the team more productive','Improve visibility, reporting and decisions','Scale without immediately hiring more people','Not sure — show me the biggest opportunities']}
     ]
   },
@@ -132,6 +133,7 @@ function renderReport() {
     '<h2 id="assessmentTitle">'+escapeHtml(report.title)+'</h2>'+
     '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>'+
     '<div class="report-highlight"><span>'+escapeHtml(report.highlightLabel)+'</span><strong>'+escapeHtml(report.highlight)+'</strong><small>'+escapeHtml(report.highlightNote)+'</small></div>'+
+    (isBusiness ? renderBusinessVisuals(report) : '')+
     '<div class="report-section"><h3>Your priority areas</h3><div class="report-recommendations">'+report.priorities.map((item,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></div></article>').join('')+'</div></div>'+
     '<div class="report-section"><h3>Your next steps</h3><ol class="report-next-steps">'+report.steps.map(item=>'<li>'+escapeHtml(item)+'</li>').join('')+'</ol></div>'+
     '<p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p>'+
@@ -145,7 +147,7 @@ function buildBusinessReport() {
   const high = Math.round(hours * .3 * 10)/10;
   const annualLow = Math.round(low * 46);
   const annualHigh = Math.round(high * 46);
-  const rate = Number(answers.hourlyCost || 0);
+  const rate = Number(answers.hourlyCost || 0);\n  const currency = (answers.currency || 'USD — US Dollar').slice(0,3);\n  const money = value => new Intl.NumberFormat(undefined,{style:'currency',currency,maximumFractionDigits:0}).format(value);
   const functions = answers.functions || [];
   const tasks = answers.tasks || [];
   const recommendations = [];
@@ -187,6 +189,53 @@ function buildBusinessReport() {
     steps:[goalMap[answers.goal]||'Pick one high-volume manual workflow to examine first.','Map the current steps, tools involved, time spent and common errors.','Choose one small automation pilot and define how success will be measured.','Review the result before expanding to other departments.'],
     disclaimer:'This is an initial, rules-based assessment using the information you supplied. Time and value ranges are illustrative planning estimates, not a forecast or promise. Actual results depend on workflow suitability, software costs, adoption and oversight.'
   };
+}
+function buildOpportunityChart(functions,annualLow,annualHigh,rate,currency) {
+  const weights = {
+    'Sales & lead generation':18,'Marketing':13,'Customer service':15,
+    'Human resources & recruitment':10,'Finance & accounting':12,
+    'Operations & administration':16,'Stock, suppliers & logistics':9,
+    'Management & reporting':7
+  };
+  const selected = functions.length ? functions : ['Operations & administration','Sales & lead generation','Customer service'];
+  const total = selected.reduce((sum,name)=>sum+(weights[name]||10),0);
+  let cursor = 0;
+  const palette = ['#3478f6','#42c6d9','#6b83d9','#7b9bbd','#8b78c6','#42a58e','#e2a85b','#8795a8'];
+  const items = selected.map((name,index)=>{
+    const share = (weights[name]||10)/total;
+    const start = cursor;
+    cursor += share*100;
+    return {name,share,colour:palette[index%palette.length],hoursLow:Math.round(annualLow*share),hoursHigh:Math.round(annualHigh*share),valueLow:Math.round(annualLow*share*rate),valueHigh:Math.round(annualHigh*share*rate),start,end:cursor};
+  });
+  return {items,currency};
+}
+function buildGrowthOpportunities(goal,functions) {
+  const ideas = [];
+  if (functions.includes('Sales & lead generation') || goal==='Win more customers and respond faster') ideas.push({title:'Convert more enquiries into customers',body:'Faster lead response, consistent follow-up and clearer pipeline visibility can help reduce missed opportunities.'});
+  if (functions.includes('Customer service') || goal==='Improve customer experience') ideas.push({title:'Improve retention and repeat business',body:'Quicker answers, proactive updates and consistent service can strengthen customer experience and encourage repeat purchases.'});
+  if (goal==='Scale without immediately hiring more people' || goal==='Make the team more productive') ideas.push({title:'Increase capacity without matching headcount growth',body:'Standardised workflows can help the current team handle more volume while managers monitor quality and workload.'});
+  if (functions.includes('Management & reporting') || goal==='Improve visibility, reporting and decisions') ideas.push({title:'Make faster, better-informed decisions',body:'Reliable operational reporting can reveal bottlenecks, demand patterns and areas where resources are underused.'});
+  if (functions.includes('Marketing')) ideas.push({title:'Make marketing more measurable',body:'Automated campaign tracking and lead attribution can show which channels generate qualified demand.'});
+  if (ideas.length<3) ideas.push({title:'Free up time for higher-value work',body:'Redirect time released from repetitive administration towards customer relationships, service quality and business development.'});
+  if (ideas.length<3) ideas.push({title:'Build a repeatable operating model',body:'Documenting and connecting core processes makes it easier to maintain consistency as the business grows.'});
+  return ideas.slice(0,3);
+}
+function renderBusinessVisuals(report) {
+  const chart = report.chart;
+  if (!chart || !chart.items.length) return '';
+  const stops = chart.items.map(item=>item.colour+' '+item.start+'% '+item.end+'%').join(',');
+  const bars = chart.items.map(item=>{
+    const value = item.hoursHigh ? Math.round(item.hoursHigh) : 0;
+    const width = report.chart.items.reduce((max,x)=>Math.max(max,x.hoursHigh),0);
+    const pct = width ? Math.max(4,value/width*100) : 0;
+    const valueText = chart.items.length && Number(answers.hourlyCost||0)
+      ? escapeHtml(new Intl.NumberFormat(undefined,{style:'currency',currency:chart.currency,maximumFractionDigits:0}).format(item.valueLow))+'–'+escapeHtml(new Intl.NumberFormat(undefined,{style:'currency',currency:chart.currency,maximumFractionDigits:0}).format(item.valueHigh))
+      : item.hoursLow+'–'+item.hoursHigh+' hrs';
+    return '<div class="report-bar-row"><div class="report-bar-label"><span>'+escapeHtml(item.name)+'</span><strong>'+valueText+'</strong></div><div class="report-bar-track"><i style="width:'+pct+'%;background:'+item.colour+'"></i></div></div>';
+  }).join('');
+  const legend = chart.items.map(item=>'<div class="report-legend-item"><i style="background:'+item.colour+'"></i><span>'+escapeHtml(item.name)+'</span></div>').join('');
+  const growth = report.growth.map((item,i)=>'<article class="growth-card"><span>GROWTH '+(i+1)+'</span><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></article>').join('');
+  return '<section class="report-section"><h3>Where automation could release capacity</h3><p class="report-chart-intro">Illustrative allocation of the potential time opportunity across the business functions you selected. It is a planning model, not measured departmental waste.</p><div class="report-chart-grid"><article class="report-chart-card"><div class="report-chart-heading"><strong>Opportunity by function</strong><small>Share of estimated opportunity</small></div><div class="report-donut-wrap"><div class="report-donut" style="background:conic-gradient('+stops+')"><span>Potential<br>capacity</span></div><div class="report-legend">'+legend+'</div></div></article><article class="report-chart-card"><div class="report-chart-heading"><strong>Estimated annual capacity</strong><small>'+(Number(answers.hourlyCost||0)?'Indicative labour value':'Hours potentially reclaimed')+'</small></div><div class="report-bars">'+bars+'</div></article></div></section><section class="report-section"><h3>Where the business could grow</h3><p class="report-chart-intro">These are growth levers to investigate after improving the underlying workflows.</p><div class="growth-grid">'+growth+'</div></section>';
 }
 function buildFounderReport() {
   const stage = answers.stage || 'Just an idea';
