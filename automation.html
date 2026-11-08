@@ -3,10 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101d35">
-  <meta name="description" content="Explore how Donninger.AI can streamline business workflows with practical, human-supervised automation.">
-  <title>Business Function Automation — Donninger.AI</title>
+  <meta name="theme-color" content="#101b2c">
+  <meta name="description" content="Explore how Donninger.AI designs practical, human-supervised automation around your business workflows.">
+  <title>Business Automation — Donninger.AI</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="function-page">
@@ -23,44 +26,114 @@
   </header>
   <main id="functionContent">
     <section class="function-hero dark-section">
-      <div class="container function-hero-inner">
-        <a class="function-back" href="index.html#automation-functions">← All automation functions</a>
-        <div class="eyebrow eyebrow-light">DONNINGER.AI / BUSINESS AUTOMATION</div>
-        <h1 id="functionTitle">Business function automation</h1>
-        <p class="function-lede" id="functionIntro">Practical automation designed around the way your business works.</p>
-        <a class="button button-primary" href="index.html#assessments">Assess your business <span>→</span></a>
+      <div class="container function-hero-layout">
+        <div class="function-hero-copy">
+          <a class="function-back" href="index.html#automation-functions">← All automation functions</a>
+          <div class="eyebrow eyebrow-light">DONNINGER.AI / BUSINESS AUTOMATION</div>
+          <div class="function-hero-label" id="functionLabel">YOUR BUSINESS, BETTER CONNECTED</div>
+          <h1 id="functionTitle">Business function automation</h1>
+          <p class="function-lede" id="functionIntro">Practical automation designed around the way your business works.</p>
+          <div class="function-hero-actions">
+            <a class="button button-primary" href="index.html#assessments">Assess your business <span>→</span></a>
+            <a class="function-secondary-link" href="#how-it-works">See how it works ↓</a>
+          </div>
+          <div class="function-hero-proof"><span>01</span> BUILT AROUND YOUR WORKFLOWS <i></i><span>02</span> HUMAN-APPROVED <i></i><span>03</span> MEASURED WITH YOU</div>
+        </div>
+        <div class="function-hero-art" id="functionHeroArt" aria-label="Illustration of a connected business automation workspace"></div>
       </div>
     </section>
+
+    <section class="function-trust-strip">
+      <div class="container function-trust-grid">
+        <div><span>01</span><strong>Your systems</strong><small>Work with the tools you already use where integrations are available.</small></div>
+        <div><span>02</span><strong>Your rules</strong><small>Set the process, permissions, approvals and exceptions.</small></div>
+        <div><span>03</span><strong>Your visibility</strong><small>Track activity, outstanding work and agreed performance measures.</small></div>
+      </div>
+    </section>
+
     <section class="section-pad function-main-section">
       <div class="container">
-        <div class="function-overview-grid">
-          <div><div class="eyebrow">THE OPPORTUNITY</div><h2>Less repetitive work.<br><span>More room to move.</span></h2></div>
+        <div class="function-section-heading">
+          <div><div class="eyebrow">THE BUSINESS CASE</div><h2>Take routine work off your team's plate.<br><span>Keep control of the important work.</span></h2></div>
           <p id="functionOverview" class="function-body-copy"></p>
         </div>
-        <div class="function-detail-grid">
-          <article class="function-detail-card">
-            <div class="eyebrow">AUTOMATABLE ACTIVITIES</div><h3>Tasks Donninger.AI can handle</h3>
-            <ul id="functionTasks"></ul>
-            <div class="eyebrow function-subheading">AI-ASSISTED ACTIVITIES</div><h3>Prepared for human review</h3>
-            <ul id="functionAssisted"></ul>
-          </article>
-          <article class="function-detail-card function-detail-card-tint">
-            <div class="eyebrow">PRACTICAL EXAMPLE</div><h3>How the workflow works</h3>
-            <ol id="functionWorkflow"></ol>
-          </article>
-        </div>
+
+        <section class="function-workspace" aria-labelledby="workspaceTitle">
+          <div class="function-workspace-top">
+            <div><div class="eyebrow">A VIEW INTO YOUR AUTOMATION</div><h3 id="workspaceTitle">One connected workflow. A clear view of what happens next.</h3></div>
+            <span class="function-live-tag"><i></i> EXAMPLE WORKSPACE</span>
+          </div>
+          <div class="function-workspace-grid">
+            <div class="function-workflow-panel">
+              <div class="function-panel-heading"><strong>Workflow overview</strong><small id="workflowCount">Configured around your process</small></div>
+              <div id="functionWorkflowDiagram" class="function-workflow-diagram"></div>
+              <div class="function-workflow-foot"><span><i class="flow-dot flow-auto"></i> Automated steps</span><span><i class="flow-dot flow-human"></i> Human checkpoints</span></div>
+            </div>
+            <div class="function-insight-panel">
+              <div class="function-panel-heading"><strong>What your team can see</strong><small>Illustrative dashboard</small></div>
+              <div id="functionInsightCards" class="function-insight-cards"></div>
+              <div class="function-mini-chart">
+                <div class="function-mini-chart-head"><strong>Performance tracking</strong><span>Baseline → target → actual</span></div>
+                <div class="function-chart-bars" id="functionChartBars"></div>
+                <p>We agree the measures and record your real baseline before setting targets. This preview contains no assumed business results.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="function-process-section" id="how-it-works">
+          <div class="function-section-heading compact">
+            <div><div class="eyebrow">HOW THE AUTOMATION WORKS</div><h2>Designed around <span>your way of working.</span></h2></div>
+            <p>We do not expect your team to change everything to fit a generic product. We map the way work enters your business, who handles it and what a successful outcome looks like.</p>
+          </div>
+          <div class="function-detail-grid">
+            <article class="function-detail-card">
+              <div class="function-card-icon">↗</div><div class="eyebrow">AUTOMATION THAT DOES THE LEGWORK</div><h3>What the system can handle</h3>
+              <p>Repeatable, rules-based tasks can move through the workflow automatically, with activity recorded for visibility.</p>
+              <ul id="functionTasks"></ul>
+            </article>
+            <article class="function-detail-card function-detail-card-tint">
+              <div class="function-card-icon">✦</div><div class="eyebrow">AI-ASSISTED WORK</div><h3>Prepared for your team's judgement</h3>
+              <p>AI can organise information and prepare a useful first draft. Your people review decisions that need context, expertise or accountability.</p>
+              <ul id="functionAssisted"></ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="function-fit-section">
+          <div class="function-section-heading compact">
+            <div><div class="eyebrow">MADE TO FIT YOUR BUSINESS</div><h2>You set the rules.<br><span>We configure the workflow.</span></h2></div>
+            <p>Before anything goes live, we work with you to understand the information, tools and operating rules the automation needs.</p>
+          </div>
+          <div class="function-fit-grid">
+            <article class="function-fit-card"><span class="function-fit-number">01</span><h3>What we configure with you</h3><p>These are the business details and preferences that shape your setup.</p><ul id="functionInputs"></ul></article>
+            <article class="function-fit-card"><span class="function-fit-number">02</span><h3>What the system keeps organised</h3><p>Records and activity history help your team understand what happened and what still needs attention.</p><ul id="functionRecords"></ul></article>
+            <article class="function-fit-card function-fit-control"><span class="function-fit-number">03</span><h3>Where you stay in control</h3><p>Approval points and responsibilities are agreed with your business—not guessed by the software.</p><ul id="functionHuman"></ul></article>
+          </div>
+        </section>
+
+        <section class="function-implementation">
+          <div class="function-implementation-copy"><div class="eyebrow">FROM DISCOVERY TO DELIVERY</div><h2>A practical rollout.<br><span>No black box.</span></h2><p>We start with one clearly defined workflow, test it with your team and expand only when it works as intended. You can see the proposed process, review the approval points and agree how success will be measured.</p><div class="function-implementation-note"><strong>Your implementation plan</strong><span>Scope, owners, connected tools, test cases and success measures are agreed before launch.</span></div></div>
+          <div class="function-implementation-steps" id="functionMethod"></div>
+        </section>
+
+        <section class="function-measure-section">
+          <div class="function-section-heading compact">
+            <div><div class="eyebrow">OUTCOMES THAT MATTER</div><h2>Measure the work.<br><span>Prove the improvement.</span></h2></div>
+            <p>We establish a starting point with you, then compare actual results after implementation. The measures below are areas to track—not promised outcomes.</p>
+          </div>
+          <div class="function-outcome-grid" id="functionOutcomes"></div>
+          <div class="function-measure-note"><strong>How we measure value:</strong> agree a baseline, track workflow activity, compare time and quality measures, include software and support costs, then review the net operational impact with you. Reclaimed staff capacity is not automatically a cash saving.</div>
+        </section>
+
         <section class="function-oversight">
           <div class="function-oversight-mark">✓</div>
-          <div><div class="eyebrow">AUTOMATION WITH OVERSIGHT</div><h3>AI supports your people. It doesn't remove accountability.</h3><p id="functionOversight"></p></div>
+          <div><div class="eyebrow">ACCOUNTABILITY BUILT IN</div><h3>Your team remains in charge of decisions that matter.</h3><p id="functionOversight"></p></div>
         </section>
-        <section class="function-outcomes">
-          <div class="eyebrow">WHAT WE AIM TO IMPROVE</div><h2>Measure the difference.</h2>
-          <div class="function-outcome-grid" id="functionOutcomes"></div>
-          <p class="function-measure-note">We establish a baseline with you, then measure the actual impact after implementation. Savings depend on your current process, transaction volume, software costs and team adoption — we do not promise a fixed result before assessing the business.</p>
-        </section>
+
         <section class="function-cta dark-section">
-          <div><div class="eyebrow eyebrow-light">START WITH YOUR BUSINESS</div><h2>Find out what is<br><span>worth automating.</span></h2><p>A free assessment helps us understand your workflows, estimate the opportunity and recommend the most sensible first step.</p></div>
-          <a class="button button-primary" href="index.html#assessments">Get your free assessment <span>→</span></a>
+          <div><div class="eyebrow eyebrow-light">PUT YOUR BUSINESS IN THE DRIVING SEAT</div><h2>Start with your process.<br><span>Build the right solution.</span></h2><p>Complete a free assessment to show us how your business operates. We'll use your answers to identify suitable workflows, understand the tools you use and recommend a sensible first implementation.</p></div>
+          <div class="function-cta-actions"><a class="button button-primary" href="index.html#assessments">Get your free assessment <span>→</span></a><a href="index.html#automation-functions" class="function-cta-back">Explore all automation functions</a></div>
         </section>
       </div>
     </section>
