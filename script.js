@@ -147,7 +147,9 @@ function buildBusinessReport() {
   const high = Math.round(hours * .3 * 10)/10;
   const annualLow = Math.round(low * 46);
   const annualHigh = Math.round(high * 46);
-  const rate = Number(answers.hourlyCost || 0);\n  const currency = (answers.currency || 'USD — US Dollar').slice(0,3);\n  const money = value => new Intl.NumberFormat(undefined,{style:'currency',currency,maximumFractionDigits:0}).format(value);
+  const rate = Number(answers.hourlyCost || 0);
+  const currency = (answers.currency || 'USD — US Dollar').slice(0,3);
+  const money = value => new Intl.NumberFormat(undefined,{style:'currency',currency,maximumFractionDigits:0}).format(value);
   const functions = answers.functions || [];
   const tasks = answers.tasks || [];
   const recommendations = [];
@@ -175,9 +177,9 @@ function buildBusinessReport() {
   let highlight = hours ? annualLow+'–'+annualHigh+' hours / year' : 'Measure your manual workload first';
   let note = hours ? 'Illustrative capacity that may be released if suitable workflows reduce repetitive admin by 20–30%, over 46 working weeks.' : 'Add a weekly estimate of repetitive admin time to calculate an indicative opportunity.';
   if (rate && hours) {
-    const moneyLow = Math.round(annualLow*rate).toLocaleString();
-    const moneyHigh = Math.round(annualHigh*rate).toLocaleString();
-    highlight = moneyLow+'–'+moneyHigh+' local currency units / year';
+    const moneyLow = money(annualLow*rate);
+    const moneyHigh = money(annualHigh*rate);
+    highlight = moneyLow+'–'+moneyHigh+' / year';
     note = 'Indicative labour-capacity value using your hourly cost and a 20–30% reduction assumption. This is not a guaranteed cash saving.';
   }
   return {
@@ -186,6 +188,8 @@ function buildBusinessReport() {
     highlightLabel:'POTENTIAL ADMIN CAPACITY TO RECLAIM',
     highlight,highlightNote:note,
     priorities:recommendations.slice(0,4),
+    chart:buildOpportunityChart(functions,annualLow,annualHigh,rate,currency),
+    growth:buildGrowthOpportunities(answers.goal,functions),
     steps:[goalMap[answers.goal]||'Pick one high-volume manual workflow to examine first.','Map the current steps, tools involved, time spent and common errors.','Choose one small automation pilot and define how success will be measured.','Review the result before expanding to other departments.'],
     disclaimer:'This is an initial, rules-based assessment using the information you supplied. Time and value ranges are illustrative planning estimates, not a forecast or promise. Actual results depend on workflow suitability, software costs, adoption and oversight.'
   };
