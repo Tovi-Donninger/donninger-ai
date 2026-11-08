@@ -154,6 +154,23 @@ function loadPdfLibrary() {
   });
   return pdfLibraryPromise;
 }
+let pdfJsPromise;
+function loadPdfJs() {
+  if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  if (!pdfJsPromise) pdfJsPromise = new Promise((resolve,reject) => {
+    const script=document.createElement('script');
+    script.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    script.async=true;
+    script.onload=()=>{
+      if (!window.pdfjsLib) { reject(new Error('The PDF flattening library did not load.')); return; }
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      resolve(window.pdfjsLib);
+    };
+    script.onerror=()=>reject(new Error('Could not load the PDF flattening library. Check your internet connection and try again.'));
+    document.head.appendChild(script);
+  });
+  return pdfJsPromise;
+}
 function safePdfText(value,max=900) {
   const text=String(value??'').replace(/\r/g,'').replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim();
   if (text.length<=max) return text;
@@ -162,7 +179,7 @@ function safePdfText(value,max=900) {
 function pdfFilename(report) {
   const base=(report.clientName||report.title||'Donninger-AI-Assessment').toString()
     .normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').slice(0,55);
-  return (base||'Donninger-AI-Assessment')+'-Editable-Report.pdf';
+  return (base||'Donninger-AI-Assessment')+'-Assessment-Report.pdf';
 }
 async function createAssessmentPdf(report,isBusiness) {
   const PDFLib=await loadPdfLibrary();
@@ -260,11 +277,15 @@ async function createAssessmentPdf(report,isBusiness) {
     addLabel(p1,'Expected customer',LEFT,346); addField(p1,'target_customer',answers.customer||'Not provided',LEFT,358,CONTENT,42,{maxLength:150});
   }
   heading(p1,'Executive summary',425);
-  addField(p1,'executive_summary',report.summary||'Your assessment summary will appear here.',LEFT,458,CONTENT,88,{fontSize:10,maxLength:700});
+  const executiveSummary = isBusiness
+    ? (()=>{const requested=report.requestedFunctions||[];const recommended=report.recommendedFunctions||[];const focus=recommended.length?recommended.slice(0,3).join(', '):'mapping the highest-friction manual workflow';return 'This assessment reviewed '+industry.toLowerCase()+' operations for a team of '+team.toLowerCase()+', with the stated goal of '+goal.toLowerCase()+'. '+(requested.length?'You asked us to consider '+requested.length+' function(s): '+requested.join(', ')+'. ':'You did not select a specific function to automate. ')+(recommended.length?'The answers indicate that the strongest areas to investigate are '+focus+'. ':'There is not yet enough evidence to recommend a paid automation package. ')+'These are preliminary, rules-based recommendations and must be validated against your actual workflows, systems and costs.';})()
+    : (()=>{const priorities=report.priorities||[];return 'Your idea is: '+safePdfText(answers.idea||'Not provided',180)+'. You are currently at the '+(answers.stage||'early planning')+' stage, aiming to serve '+(answers.customer||'a customer group still to be defined').toLowerCase()+'. '+(priorities.length?'The first priorities identified are '+priorities.slice(0,3).map(x=>x.title).join(', ')+'. ':'The next step is to clarify the customer problem and test demand. ')+'Use the roadmap to reduce uncertainty, validate assumptions and build in stages before committing significant resources.';})();
+  addField(p1,'executive_summary',executiveSummary,LEFT,458,CONTENT,88,{fontSize:9.5,maxLength:650});
   heading(p1,'How to use this report',572);
-  addField(p1,'report_guidance',isBusiness
-    ? 'Review the comparison and recommendations, confirm that the suggested workflows match how your business actually operates, and use the pricing page as an initial proposal. All implementation scope, integrations and third-party costs must be confirmed before work begins.'
-    : 'Use the priorities and roadmap as a starting point. Validate demand with real customers, confirm local legal and regulatory requirements, and update this document as your business plan develops.',LEFT,605,CONTENT,112,{fontSize:9,maxLength:800});
+  const reportGuidance = isBusiness
+    ? '1. Check the “Business at a glance” table against your current operations. 2. Compare your requested functions with our independent recommendations. 3. Review the workflows and confirm that the examples match your processes. 4. Use the pricing breakdown as an initial estimate only. Before proceeding, Donninger.AI will confirm scope, integrations, approvals, data access and any third-party or usage-based costs with you.'
+    : '1. Read the priorities and roadmap in order. 2. Speak with potential customers and test whether they will pay for the solution. 3. Validate competitors, costs, pricing and local legal requirements. 4. Start with the smallest practical version, measure real results and revise the plan as you learn. Don’t treat assumptions in this report as guaranteed outcomes or professional legal, tax or financial advice.';
+  addField(p1,'report_guidance',reportGuidance,LEFT,605,CONTENT,112,{fontSize:8.5,maxLength:900});
   addField(p1,'report_date',date,LEFT,746,CONTENT,22,{fontSize:8,maxLength:40});
   addLabel(p1,'Report date',LEFT,735);
 
@@ -382,10 +403,32 @@ async function createAssessmentPdf(report,isBusiness) {
     addField(p4,'founder_methodology',methodology,LEFT,133,CONTENT,120,{fontSize:9,maxLength:800});
     heading(p4,'Important assessment notes',282);
     addField(p4,'founder_disclaimer',report.disclaimer||'This is an initial planning report, not professional advice.',LEFT,315,CONTENT,120,{fontSize:9,maxLength:800});
-    heading(p4,'Your editable notes',466);
-    addField(p4,'founder_notes','',LEFT,499,CONTENT,180,{fontSize:9,maxLength:1200});
   }
-  const bytes=await pdf.save();
+  // Rasterise every finished page into a new image-only PDF, removing editable text objects and form fields.
+  const sourceBytes=await pdf.save();
+  const pdfjs=await loadPdfJs();
+  const source=await pdfjs.getDocument({data:sourceBytes}).promise;
+  const flattened=await PDFDocument.create();
+  flattened.setTitle((report.title||'Donninger.AI Assessment')+' | Donninger.AI');
+  flattened.setAuthor('Donninger.AI');
+  flattened.setSubject('Static, flattened Donninger.AI assessment report');
+  for(let pageNumber=1;pageNumber<=source.numPages;pageNumber++){
+    const sourcePage=await source.getPage(pageNumber);
+    const viewport=sourcePage.getViewport({scale:2});
+    const canvas=document.createElement('canvas');
+    canvas.width=Math.ceil(viewport.width); canvas.height=Math.ceil(viewport.height);
+    const context=canvas.getContext('2d',{alpha:false});
+    await sourcePage.render({canvasContext:context,viewport,background:'rgb(255,255,255)'}).promise;
+    const binary=atob(canvas.toDataURL('image/png').split(',')[1]);
+    const imageBytes=new Uint8Array(binary.length);
+    for(let i=0;i<binary.length;i++) imageBytes[i]=binary.charCodeAt(i);
+    const image=await flattened.embedPng(imageBytes);
+    const page=flattened.addPage([W,H]);
+    page.drawImage(image,{x:0,y:0,width:W,height:H});
+    canvas.width=canvas.height=1;
+    sourcePage.cleanup();
+  }
+  const bytes=await flattened.save();
   const blob=new Blob([bytes],{type:'application/pdf'});
   const url=URL.createObjectURL(blob);
   const link=document.createElement('a');
