@@ -1,7 +1,14 @@
 {
   "name": "donninger-ai",
+  "main": "worker.js",
   "compatibility_date": "2026-11-08",
+  "vars": {
+    "DEV_ADMIN_ENABLED": "true",
+    "DEV_ADMIN_EMAIL": "admin@donninger.ai"
+  },
   "assets": {
-    "directory": "."
+    "directory": ".",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
   }
 }
