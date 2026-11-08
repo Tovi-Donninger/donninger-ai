@@ -170,14 +170,13 @@ function bindDownloadReport() {
 function renderReport() {
   const isBusiness = activeAssessment === assessments.business;
   const report = isBusiness ? buildBusinessReport() : buildFounderReport();
-  modalContent.innerHTML = '<div class="report-topline"><span class="assessment-kicker">YOUR DONNINGER.AI REPORT'+(isBusiness && report.clientName ? ' · PREPARED FOR '+escapeHtml(report.clientName) : '')+'</span><span class="report-date">'+new Date().toLocaleDateString()+'</span></div>'+
+  const intro = '<div class="report-topline"><span class="assessment-kicker">YOUR DONNINGER.AI REPORT'+(isBusiness && report.clientName ? ' · PREPARED FOR '+escapeHtml(report.clientName) : '')+'</span><span class="report-date">'+new Date().toLocaleDateString()+'</span></div>'+
     '<h2 id="assessmentTitle">'+escapeHtml(report.title)+'</h2>'+
-    '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>'+
-    '<div class="report-highlight"><span>'+escapeHtml(report.highlightLabel)+'</span><strong>'+escapeHtml(report.highlight)+'</strong><small>'+escapeHtml(report.highlightNote)+'</small></div>'+
-    (isBusiness ? renderBusinessVisuals(report) : '')+
-    '<div class="report-section"><h3>Your priority areas</h3><div class="report-recommendations">'+report.priorities.map((item,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p>'+renderAutomationLink(item.title)+'</div></article>').join('')+'</div></div>'+
-    '<div class="report-section"><h3>Your next steps</h3><ol class="report-next-steps">'+report.steps.map(item=>'<li>'+escapeHtml(item)+'</li>').join('')+'</ol></div>'+
-    renderFinalRecommendations(report,isBusiness)+
+    '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>';
+  const businessSections = isBusiness
+    ? renderBusinessComparison(report)+renderBusinessPricing(report)
+    : renderFounderSections(report);
+  modalContent.innerHTML = intro+businessSections+
     '<section class="report-section report-notes"><h3>Important assessment notes</h3><p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p></section>'+
     renderDownloadReportSection()+
     '<div class="assessment-actions report-actions"><button class="assessment-back" type="button" id="assessmentRestart">Start again</button><button class="button button-primary" type="button" id="assessmentPrint">Print / Save report <span>↗</span></button></div>';
@@ -185,6 +184,25 @@ function renderReport() {
   document.getElementById('assessmentPrint').addEventListener('click',()=>window.print());
   bindDownloadReport();
 }
+function renderFounderSections(report) {
+  const idea = answers.idea || 'Business idea not specified';
+  const context = [answers.industry,answers.stage,answers.customer,answers.model].filter(Boolean);
+  const resources = answers.resources || [];
+  const recommendations = (report.priorities||[]).slice(0,4);
+  const opportunities = [
+    {title:'Validate demand before investing heavily',body:'Use customer conversations and a small real-world test to confirm that people will pay for the proposed solution.'},
+    {title:'Build a lean first version',body:'Start with the smallest useful offer and add systems only when real demand and repeatable processes justify them.'},
+    {title:'Create measurable growth milestones',body:'Track enquiries, conversion, revenue, delivery costs and customer feedback from the beginning.'}
+  ];
+  return '<section class="report-section"><h3>1. What you told us</h3><div class="report-summary-panel"><strong>'+escapeHtml(idea)+'</strong><p>'+escapeHtml(context.join(' · ')||'Further business details can be confirmed during planning.')+'</p><small>'+escapeHtml(resources.length?resources.length+' resource area(s) already identified.':'Your available resources still need to be mapped.')+'</small></div></section>'+
+    '<section class="report-section"><h3>2. What we recommend</h3>'+renderReportItems(recommendations,'We need a little more information before recommending a specific starting point.')+'</section>'+
+    '<section class="report-section"><h3>3. Opportunities we identified</h3>'+renderReportItems(opportunities)+'</section>';
+}
+function renderReportItems(items,emptyText) {
+  if(!items || !items.length) return '<p class="report-field-note">'+escapeHtml(emptyText||'No additional items were identified from the information provided.')+'</p>';
+  return '<div class="report-recommendations">'+items.map((item,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></div></article>').join('')+'</div>';
+}
+
 const functionDetails = {
   'Sales & lead generation': {task:'Lead capture, qualification, follow-up reminders and quote preparation'},
   'Marketing': {task:'Campaign scheduling, content repurposing, lead routing and performance reporting'},
@@ -243,42 +261,33 @@ function renderFunctionLinks(names,buttonLabel) {
 function renderBusinessComparison(report) {
   const requested=report.requestedFunctions||[];
   const recommended=report.recommendedFunctions||[];
-  const overlap=requested.filter(name=>recommended.includes(name));
-  const additional=recommended.filter(name=>!requested.includes(name));
-  const notPrioritised=requested.filter(name=>!recommended.includes(name));
-  const list=(title,items,empty)=>'<div class="report-section"><h3>'+title+'</h3>'+(items.length?'<div class="report-recommendations">'+renderFunctionLinks(items,'Explore this function')+'</div>':'<p class="report-field-note">'+empty+'</p>')+'</div>';
-  return '<section class="report-section"><h3>Your priorities compared with our assessment</h3><p class="report-chart-intro">We have kept your preferences separate from our assessment. Areas you selected are not automatically treated as necessary; additional recommendations are based on the operational issues and goals you described.</p><div class="report-comparison-summary"><p><strong>'+overlap.length+'</strong> requested function(s) also appear in our recommendations.</p><p><strong>'+additional.length+'</strong> additional function(s) are recommended based on your answers.</p><p><strong>'+notPrioritised.length+'</strong> requested function(s) are not a first priority in this initial assessment.</p></div></section>'+
-    list('Functions you asked us to look at',requested,'You did not select any specific functions. We have based the proposal on the needs described in your answers.')+
-    list('Functions we recommend prioritising',recommended,'We do not yet have enough evidence to recommend a specific department. Start by mapping the most repetitive or disruptive workflow.')+
-    (additional.length?list('Additional opportunities we identified',additional,''):'')+
-    (notPrioritised.length?'<section class="report-section"><h3>Your requested functions we would defer for now</h3><p class="report-chart-intro">These are not rejected. Based on the information provided, we would investigate them after the higher-priority workflows, or revisit them if your priorities change.</p><div class="report-recommendations">'+renderFunctionLinks(notPrioritised,'Review this function')+'</div></section>':'');
-}
-function calculateBusinessProposal(report) {
-  const recommended=report.recommendedFunctions||[];
-  const count=recommended.length;
-  const requested=report.requestedFunctions||[];
-  const bundleSetup=1000, bundleMonthly=100;
-  const individualSetup=count*200, individualMonthly=count*20;
-  const bundleMakesFinancialSense=count>=5;
-  const recommendBundle=bundleMakesFinancialSense && (count>=6 || requested.length>=5);
-  const proposalFunctions=recommendBundle?8:count;
-  const setup=recommendBundle?bundleSetup:individualSetup;
-  const monthly=recommendBundle?bundleMonthly:individualMonthly;
-  const totalFirstYear=setup+monthly*12;
-  return {count,proposalFunctions,setup,monthly,totalFirstYear,individualSetup,individualMonthly,recommendBundle,bundleSetup,bundleMonthly};
+  const additional=(report.growth||[]).slice(0,3);
+  const requestedBlock=requested.length
+    ? renderFunctionLinks(requested,'Explore this function')
+    : '<p class="report-field-note">You did not select a specific function. We have considered the tasks and business goal you described.</p>';
+  const recommendedBlock=recommended.length
+    ? '<div class="report-recommendations">'+recommended.map((name,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>'+escapeHtml(functionDetails[name]?.task||'Review the current workflow, tools and approval requirements.')+'</p>'+renderAutomationLink(name)+'</div></article>').join('')+'</div>'
+    : '<p class="report-field-note">There is not yet enough evidence to recommend a specific function. We suggest mapping one repetitive workflow before selecting a package.</p>';
+  return '<section class="report-section report-customer-wants"><h3>1. What you want</h3><p class="report-chart-intro">The business functions you specifically asked us to consider.</p>'+requestedBlock+'</section>'+
+    '<section class="report-section report-our-recommendations"><h3>2. What we recommend</h3><p class="report-chart-intro">Our recommendations are based on the operational challenges and goals in your answers, not simply on the functions selected.</p>'+recommendedBlock+'</section>'+
+    '<section class="report-section report-opportunities"><h3>3. Opportunities we identified</h3><p class="report-chart-intro">Potential ways to improve performance once the core workflows are working reliably.</p>'+renderReportItems(additional,'No additional growth opportunities stood out from the information provided.')+'</section>';
 }
 function renderBusinessPricing(report) {
   const p=calculateBusinessProposal(report);
-  if (!p.count) {
-    return '<section class="report-section report-final"><h3>Your proposed package and total cost</h3><p class="report-chart-intro">We do not yet have enough information to recommend a paid package. We would rather clarify your first workflow than sell you functions without a clear business case.</p><div class="report-total"><span>Recommended next step</span><strong>Start with a workflow discovery</strong><small>Published pricing, if a function is suitable: $200 one-time setup + $20/month per function. The all-eight bundle is $1,000 setup + $100/month, but we are not recommending it based on the information currently available.</small></div><p class="report-field-note">The monthly fee includes maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment.</p></section>';
-  }
-  const proposalName=p.recommendBundle?'Complete platform bundle':'Focused '+p.count+'-function proposal';
-  const comparison=p.recommendBundle
-    ? 'The bundle is better value for this proposal: it covers all eight functions for less than buying '+p.count+' recommended functions individually, and leaves room to expand.'
-    : p.count>=5
-      ? 'The bundle costs the same or less than buying the recommended functions individually. It is worth considering if you expect to use the additional functions; otherwise, start with the focused package.'
-      : 'The focused package is the more sensible starting point. The bundle would add functions you have not yet shown a need for, so we would not recommend paying for it solely because it is discounted.';
-  return '<section class="report-section report-final"><h3>Your proposed package and total cost</h3><div class="report-total"><span>'+escapeHtml(proposalName)+'</span><strong>$'+p.setup.toLocaleString()+' setup + $'+p.monthly+'/month</strong><small>Based on '+p.count+' function(s) we recommend prioritising. Estimated first 12 months: $'+p.totalFirstYear.toLocaleString()+', excluding third-party software, messaging and usage-based AI/API charges where applicable.</small></div><p class="report-chart-intro">'+escapeHtml(comparison)+'</p><div class="report-comparison-summary"><p><strong>Focused proposal:</strong> $'+p.individualSetup.toLocaleString()+' setup + $'+p.individualMonthly+'/month for '+p.count+' recommended functions.</p><p><strong>All-eight bundle:</strong> $1,000 setup + $100/month. Save $600 upfront and $60/month compared with purchasing all eight separately.</p></div><p class="report-field-note">Our recommendation is based on suitability, not the largest sale. The monthly fee includes maintenance, support, upkeep and additions to the Donninger.AI product offering. Any third-party subscriptions, messaging charges or usage-based AI/API costs are separate and will be disclosed before commitment. Scope and integrations must be confirmed before implementation.</p>'+(p.recommendBundle?'<button type="button" class="button button-primary" data-cart-add-all>Add the recommended bundle to cart</button>':'')+'</section>';
+  const focusedSetup=p.individualSetup||0;
+  const focusedMonthly=p.individualMonthly||0;
+  const focusedYear=focusedSetup+focusedMonthly*12;
+  const bundleYear=1000+100*12;
+  const recommendedBundle=!!p.recommendBundle;
+  const selectedLabel=p.count+' recommended function(s)';
+  const focusedRow='<tr><td><strong>Focused proposal</strong><small>'+selectedLabel+'</small></td><td>$'+focusedSetup.toLocaleString()+'</td><td>$'+focusedMonthly.toLocaleString()+'</td><td>$'+focusedYear.toLocaleString()+'</td></tr>';
+  const bundleRow='<tr><td><strong>Complete platform</strong><small>All eight functions · best value</small></td><td>$1,000</td><td>$100</td><td>$'+bundleYear.toLocaleString()+'</td></tr>';
+  const recommendation=p.count
+    ? (recommendedBundle?'Based on the number of functions recommended, the complete platform offers the stronger overall value.':'We recommend starting with the focused proposal. The complete platform remains available if you expect to use the additional functions.')
+    : 'We are not recommending a paid package yet. It is better to clarify the first workflow before asking you to invest.';
+  const chartMax=Math.max(focusedYear,bundleYear,1);
+  const chart=p.count?'<div class="report-cost-chart"><div class="report-cost-chart-heading"><strong>First-year cost comparison</strong><span>Setup + 12 monthly payments</span></div><div class="report-cost-bar-row"><span>Focused</span><div><i style="width:'+Math.round(focusedYear/chartMax*100)+'%"></i></div><b>$'+focusedYear.toLocaleString()+'</b></div><div class="report-cost-bar-row bundle"><span>All eight</span><div><i style="width:'+Math.round(bundleYear/chartMax*100)+'%"></i></div><b>$'+bundleYear.toLocaleString()+'</b></div></div>':'';
+  return '<section class="report-section report-final"><h3>Pricing breakdown</h3><p class="report-chart-intro">Published pricing in USD. First-year totals include setup and 12 monthly payments.</p><div class="report-pricing-table-wrap"><table class="report-pricing-table"><thead><tr><th>Package</th><th>Setup</th><th>Monthly</th><th>First year</th></tr></thead><tbody>'+focusedRow+bundleRow+'</tbody></table></div>'+chart+'<p class="report-pricing-recommendation">'+escapeHtml(recommendation)+'</p><div class="report-pricing-savings"><strong>Bundle saving when all eight functions are needed</strong><span>$600 less upfront and $60 less every month than buying all eight individually.</span></div><p class="report-field-note">The monthly fee includes maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Scope and integrations are confirmed before implementation.</p>'+(recommendedBundle?'<button type="button" class="button button-primary" data-cart-add-all>Add the recommended bundle to cart</button>':'')+'</section>';
 }
 function renderFinalRecommendations(report,isBusiness) {
   if (isBusiness) return renderBusinessComparison(report)+renderBusinessPricing(report);
