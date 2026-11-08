@@ -71,6 +71,8 @@
   overlay.addEventListener('click', event => { if (event.target === overlay) close(); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && overlay.classList.contains('is-open')) close(); });
 
+  const addAll = () => { Object.keys(catalog).forEach(id => { if (!items.some(item => item.id === id)) items.push({ id, title: catalog[id] }); }); save(); toast('All eight functions added to your cart.'); open(); };
+
   const add = id => {
     if (!catalog[id]) return;
     if (items.some(item => item.id === id)) {
@@ -109,6 +111,8 @@
   }
 
   document.addEventListener('click', event => {
+    const addAllButton = event.target.closest('[data-cart-add-all]');
+    if (addAllButton) { addAll(); return; }
     const addButton = event.target.closest('[data-cart-add]');
     if (addButton) { add(addButton.dataset.cartAdd); render(); return; }
     const removeButton = event.target.closest('[data-cart-remove]');
@@ -164,5 +168,5 @@
     }
   });
   render();
-  window.DonningerCart = { add, open, getItems: () => items.slice() };
+  window.DonningerCart = { add, addAll, open, getItems: () => items.slice() };
 })();
