@@ -98,7 +98,7 @@
     if (pricingBox) {
       const total = pricing();
       pricingBox.hidden = items.length === 0;
-      pricingBox.innerHTML = '<div><span>' + total.label + '</span><small>' + (items.length === 8 ? 'Discounted all-functions bundle' : items.length + ' function' + (items.length === 1 ? '' : 's') + ' selected') + '</small></div><dl><dt>One-time setup</dt><dd>' + money(total.setup) + '</dd><dt>Monthly subscription</dt><dd>' + money(total.monthly) + ' / month</dd></dl>';
+      pricingBox.innerHTML = '<div><span>' + total.label + '</span><small>' + (items.length === 8 ? 'Save $600 setup + $60/month vs individual pricing' : items.length + ' function' + (items.length === 1 ? '' : 's') + ' selected') + '</small></div><dl><dt>One-time setup</dt><dd>' + money(total.setup) + '</dd><dt>Monthly subscription</dt><dd>' + money(total.monthly) + ' / month</dd></dl>';
     }
     document.querySelectorAll('[data-cart-add]').forEach(button => {
       const selected = items.some(item => item.id === button.dataset.cartAdd);
