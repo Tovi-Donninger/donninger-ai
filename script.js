@@ -151,7 +151,7 @@ function emailReportPayload(report,isBusiness,form) {
     priorities:report.priorities||[],steps:report.steps||[],disclaimer:report.disclaimer,
     clientName:report.clientName||'',industry:answers.industry||'',assessmentType:isBusiness?'Business Automation Assessment':'Entrepreneurship Assessment',
     requestedFunctions:report.requestedFunctions||[],recommendedFunctions:report.recommendedFunctions||[],
-    setup,monthly,firstYear:setup+monthly*12,bundleRecommended:bundle,
+    setup:isBusiness?(count===0?null:setup):null,monthly:isBusiness?(count===0?null:monthly):null,firstYear:isBusiness&&count>0?setup+monthly*12:null,bundleRecommended:bundle,
     hoursPerWeek:form.elements.hours.value===''?null:Number(form.elements.hours.value),
     hourlyCost:form.elements.hourlyCost.value===''?null:Number(form.elements.hourlyCost.value)
   };
