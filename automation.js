@@ -544,7 +544,7 @@ setText("functionTitle",item.title);
 setText("functionIntro",item.intro);
 const functionPricing=document.createElement("p");
 functionPricing.className="function-pricing-note";
-functionPricing.innerHTML='<strong>$200 one-time setup</strong><span>+</span><strong>$20/month</strong><small>Maintenance, support, upkeep and product additions included. Third-party software and usage charges are separate.</small>';
+functionPricing.innerHTML='<strong>$200 one-time setup</strong><span>+</span><strong>$20/month</strong><small>Maintenance, support, upkeep and product additions included. Or get all eight functions for $1,000 setup + $100/month - save $600 upfront and $60 every month. Third-party software and usage charges are separate.</small><button type="button" class="button cart-add-button" data-cart-add-all>Explore the all-functions bundle</button>';
 const pricingAnchor=document.querySelector(".function-hero-actions");
 if(pricingAnchor)pricingAnchor.insertAdjacentElement("afterend",functionPricing);
 const cartHero=document.querySelector(".function-hero-actions");
