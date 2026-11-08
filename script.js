@@ -28,11 +28,7 @@ const assessments = {
       {id:'industry',title:'Which industry best describes your business?',type:'select',required:true,options:['Professional services','Home services / trades','Retail / e-commerce','Healthcare / wellness','Hospitality / food','Technology / software','Manufacturing / logistics','Education / training','Real estate','Other']},
       {id:'team',title:'How many people work in the business?',type:'select',required:true,options:['Just me','2–5','6–15','16–50','51–200','More than 200']},
       {id:'functions',title:'Which parts of the business do you currently operate?',hint:'Select all that apply.',type:'checks',required:true,options:['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting']},
-      {id:'functionHours',title:'Roughly how many hours per week does each area take?',hint:'Enter your best estimate for each selected function. Leave blank if unsure; we will clearly label any fallback estimates.',type:'functionHours'},
       {id:'tasks',title:'Where does your team spend too much time on repetitive work?',hint:'Choose any that sound familiar.',type:'checks',options:['Responding to enquiries and following up leads','Preparing quotes, proposals or invoices','Copying information between systems','Scheduling appointments, jobs or staff','Updating spreadsheets and reports','Answering common customer questions','Recruitment, onboarding or staff administration','Chasing payments and overdue accounts','Managing stock, orders or suppliers','We are not sure yet']},
-      {id:'hours',title:'Approximately how many team hours are spent on repetitive admin each week?',hint:'A rough estimate is fine. Enter 0 if you are unsure.',type:'number',required:true,min:0,max:10000,placeholder:'e.g. 25'},
-      {id:'currency',title:'Which currency should we use in your report?',hint:'Choose the currency you use for staff costs and financial planning.',type:'select',required:true,options:['USD — US Dollar','EUR — Euro','GBP — British Pound','ILS — Israeli New Shekel','ZAR — South African Rand','CAD — Canadian Dollar','AUD — Australian Dollar','NZD — New Zealand Dollar','AED — UAE Dirham','SGD — Singapore Dollar','INR — Indian Rupee','JPY — Japanese Yen','CHF — Swiss Franc','SEK — Swedish Krona','NOK — Norwegian Krone','DKK — Danish Krone','BRL — Brazilian Real','MXN — Mexican Peso']},
-      {id:'hourlyCost',title:'What is the approximate average hourly cost of that time?',hint:'Optional. Enter the amount in the currency you selected.',type:'number',min:0,max:100000,placeholder:'e.g. 20'},
       {id:'goal',title:'What would you most like to improve first?',type:'select',required:true,options:['Win more customers and respond faster','Reduce admin and operating costs','Improve customer experience','Make the team more productive','Improve visibility, reporting and decisions','Scale without immediately hiring more people','Not sure — show me the biggest opportunities']}
     ]
   },
@@ -158,39 +154,15 @@ function renderReport() {
   document.getElementById('assessmentPrint').addEventListener('click',()=>window.print());
 }
 const functionDetails = {
-  'Sales & lead generation': {task:'Lead capture, qualification, follow-up reminders and quote preparation',rate:.25},
-  'Marketing': {task:'Campaign scheduling, content repurposing, lead routing and performance reporting',rate:.2},
-  'Customer service': {task:'Common-question responses, ticket sorting, appointment updates and service follow-ups',rate:.3},
-  'Human resources & recruitment': {task:'CV organisation, candidate updates, interview scheduling and onboarding checklists',rate:.25},
-  'Finance & accounting': {task:'Invoice preparation, receipt capture, payment reminders and reconciliations for human approval',rate:.2},
-  'Operations & administration': {task:'Data entry, document generation, task routing and recurring reports',rate:.3},
-  'Stock, suppliers & logistics': {task:'Order status updates, supplier reminders and low-stock alerts',rate:.2},
-  'Management & reporting': {task:'KPI collation, dashboard updates and recurring management reports',rate:.2}
+  'Sales & lead generation': {task:'Lead capture, qualification, follow-up reminders and quote preparation'},
+  'Marketing': {task:'Campaign scheduling, content repurposing, lead routing and performance reporting'},
+  'Customer service': {task:'Common-question responses, ticket sorting, appointment updates and service follow-ups'},
+  'Human resources & recruitment': {task:'CV organisation, candidate updates, interview scheduling and onboarding checklists'},
+  'Finance & accounting': {task:'Invoice preparation, receipt capture, payment reminders and reconciliations for human approval'},
+  'Operations & administration': {task:'Data entry, document generation, task routing and recurring reports'},
+  'Stock, suppliers & logistics': {task:'Order status updates, supplier reminders and low-stock alerts'},
+  'Management & reporting': {task:'KPI collation, dashboard updates and recurring management reports'}
 };
-function calculateSavings() {
-  const selected = answers.functions || [];
-  const entered = answers.functionHours || {};
-  const totalHours = Number(answers.hours || 0);
-  const hasBreakdown = selected.some(name => Number(entered[name]) > 0);
-  const allocated = {};
-  if (hasBreakdown) {
-    selected.forEach(name => allocated[name] = Number(entered[name] || 0));
-  } else if (selected.length && totalHours > 0) {
-    const weights = selected.map(name => ({name,weight:(functionDetails[name]?.rate || .2)}));
-    const sum = weights.reduce((n,item)=>n+item.weight,0);
-    weights.forEach(item=>allocated[item.name] = totalHours*item.weight/sum);
-  }
-  const currency = (answers.currency || 'USD — US Dollar').slice(0,3);
-  const rate = Number(answers.hourlyCost || 0);
-  const money = value => new Intl.NumberFormat(undefined,{style:'currency',currency,maximumFractionDigits:0}).format(value);
-  const rows = selected.filter(name=>allocated[name]>0).map(name=>{
-    const detail = functionDetails[name] || {task:'Review recurring workflows and identify suitable tasks',rate:.2};
-    const weekly = allocated[name];
-    const savedHours = weekly*detail.rate*46;
-    return {name,task:detail.task,weekly,savedHours,value:rate?savedHours*rate:0,rate:detail.rate};
-  }).sort((a,b)=>(rate?b.value-a.value:b.savedHours-a.savedHours));
-  return {rows,totalHours:rows.reduce((n,row)=>n+row.savedHours,0),totalValue:rows.reduce((n,row)=>n+row.value,0),hasBreakdown,currency,rate,money};
-}
 function automationSlugForRecommendation(label) {
   const value = String(label || '').toLowerCase();
   if (/sales|lead|customer acquisition|first sale/.test(value)) return 'sales';
@@ -236,14 +208,6 @@ function renderFinalRecommendations(report,isBusiness) {
   return savingsBlock+packageBlock;
 }
 function buildBusinessReport() {
-  const hours = Number(answers.hours || 0);
-  const low = Math.round(hours * .2 * 10)/10;
-  const high = Math.round(hours * .3 * 10)/10;
-  const annualLow = Math.round(low * 46);
-  const annualHigh = Math.round(high * 46);
-  const rate = Number(answers.hourlyCost || 0);
-  const currency = (answers.currency || 'USD — US Dollar').slice(0,3);
-  const money = value => new Intl.NumberFormat(undefined,{style:'currency',currency,maximumFractionDigits:0}).format(value);
   const functions = answers.functions || [];
   const tasks = answers.tasks || [];
   const recommendations = [];
@@ -268,44 +232,24 @@ function buildBusinessReport() {
     'Not sure — show me the biggest opportunities':'Start by measuring the time spent on the three most frequent manual tasks.'
   };
   const company = answers.company ? answers.company+' — ' : '';
-  let highlight = hours ? annualLow+'–'+annualHigh+' hours / year' : 'Measure your manual workload first';
-  let note = hours ? 'Illustrative capacity that may be released if suitable workflows reduce repetitive admin by 20–30%, over 46 working weeks.' : 'Add a weekly estimate of repetitive admin time to calculate an indicative opportunity.';
-  if (rate && hours) {
-    const moneyLow = money(annualLow*rate);
-    const moneyHigh = money(annualHigh*rate);
-    highlight = moneyLow+'–'+moneyHigh+' / year';
-    note = 'Your current repetitive admin represents about '+money(hours*46*rate)+' in annual labour capacity. The range above models 20–30% of that value potentially released — not guaranteed cash savings.';
-  }
   return {
     title:company+'Automation opportunity overview',
     summary:'Based on your answers, '+(answers.industry||'your business')+' has a starting point for improving '+(answers.goal||'day-to-day operations').toLowerCase()+'.',
-    highlightLabel:'POTENTIAL ADMIN CAPACITY TO RECLAIM',
-    highlight,highlightNote:note,
+    highlightLabel:'YOUR FIRST AUTOMATION PRIORITY',
+    highlight:recommendations[0]?.title || 'Map your highest-friction workflow',
+    highlightNote:'A tailored implementation begins with your real process, current software and team requirements. We confirm feasibility, integration access, approval controls and scope before quoting.',
     priorities:recommendations.slice(0,4),
-    chart:buildOpportunityChart(functions,annualLow,annualHigh,rate,currency),
+    chart:{items:functions.map(name=>({name,task:functionDetails[name]?.task || 'Review recurring workflows'}))},
     growth:buildGrowthOpportunities(answers.goal,functions),
-    steps:[goalMap[answers.goal]||'Pick one high-volume manual workflow to examine first.','Map the current steps, tools involved, time spent and common errors.','Choose one small automation pilot and define how success will be measured.','Review the result before expanding to other departments.'],
-    disclaimer:'This is an initial, rules-based assessment using the information you supplied. Time and value ranges are illustrative planning estimates, not a forecast or promise. Actual results depend on workflow suitability, software costs, adoption and oversight.'
+    steps:[goalMap[answers.goal]||'Pick one high-volume manual workflow to examine first.','Map the current steps, tools involved, owners and approval points.','Configure a focused pilot and agree how success will be measured.','Review the pilot with your team before expanding to other departments.'],
+    disclaimer:'This is an initial, rules-based assessment based on the information you supplied. It identifies areas worth investigating; it does not promise a particular saving, performance improvement or financial result. Final scope depends on workflow suitability, software access, adoption and oversight.'
   };
 }
-function buildOpportunityChart(functions,annualLow,annualHigh,rate,currency) {
-  const weights = {
-    'Sales & lead generation':18,'Marketing':13,'Customer service':15,
-    'Human resources & recruitment':10,'Finance & accounting':12,
-    'Operations & administration':16,'Stock, suppliers & logistics':9,
-    'Management & reporting':7
-  };
-  const selected = functions.length ? functions : ['Operations & administration','Sales & lead generation','Customer service'];
-  const total = selected.reduce((sum,name)=>sum+(weights[name]||10),0);
-  let cursor = 0;
-  const palette = ['#3478f6','#42c6d9','#6b83d9','#7b9bbd','#8b78c6','#42a58e','#e2a85b','#8795a8'];
-  const items = selected.map((name,index)=>{
-    const share = (weights[name]||10)/total;
-    const start = cursor;
-    cursor += share*100;
-    return {name,share,colour:palette[index%palette.length],hoursLow:Math.round(annualLow*share),hoursHigh:Math.round(annualHigh*share),valueLow:Math.round(annualLow*share*rate),valueHigh:Math.round(annualHigh*share*rate),start,end:cursor};
-  });
-  return {items,currency};
+function renderBusinessVisuals(report) {
+  const items = (report.chart && report.chart.items) || [];
+  const workflows = items.map((item,i)=>'<article class="growth-card"><span>AREA 0'+(i+1)+'</span><strong>'+escapeHtml(item.name)+'</strong><p>'+escapeHtml(item.task)+'.</p></article>').join('');
+  const growth = report.growth.map((item,i)=>'<article class="growth-card"><span>GROWTH '+(i+1)+'</span><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></article>').join('');
+  return (workflows?'<section class="report-section"><h3>Where we would focus first</h3><p class="report-chart-intro">These are the business areas you selected, with practical workflows to review during scoping. We will confirm which steps can be automated and which require a person’s approval.</p><div class="growth-grid">'+workflows+'</div></section>':'')+'<section class="report-section"><h3>Where the business could grow</h3><p class="report-chart-intro">These are growth levers to investigate after improving the underlying workflows.</p><div class="growth-grid">'+growth+'</div></section>';
 }
 function buildGrowthOpportunities(goal,functions) {
   const ideas = [];
