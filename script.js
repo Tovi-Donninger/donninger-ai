@@ -28,6 +28,7 @@ const assessments = {
       {id:'industry',title:'Which industry best describes your business?',type:'select',required:true,options:['Professional services','Home services / trades','Retail / e-commerce','Healthcare / wellness','Hospitality / food','Technology / software','Manufacturing / logistics','Education / training','Real estate','Other']},
       {id:'team',title:'How many people work in the business?',type:'select',required:true,options:['Just me','2–5','6–15','16–50','51–200','More than 200']},
       {id:'functions',title:'Which parts of the business do you currently operate?',hint:'Select all that apply.',type:'checks',required:true,options:['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting']},
+      {id:'interestedFunctions',title:'Which business functions would you like to automate?',hint:'Select all that interest you, even if you are unsure whether automation is the right solution. We will compare your priorities with our independent recommendations.',type:'checks',required:true,options:['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting']},
       {id:'tasks',title:'Where does your team spend too much time on repetitive work?',hint:'Choose any that sound familiar.',type:'checks',options:['Responding to enquiries and following up leads','Preparing quotes, proposals or invoices','Copying information between systems','Scheduling appointments, jobs or staff','Updating spreadsheets and reports','Answering common customer questions','Recruitment, onboarding or staff administration','Chasing payments and overdue accounts','Managing stock, orders or suppliers','We are not sure yet']},
       {id:'goal',title:'What would you most like to improve first?',type:'select',required:true,options:['Win more customers and respond faster','Reduce admin and operating costs','Improve customer experience','Make the team more productive','Improve visibility, reporting and decisions','Scale without immediately hiring more people','Not sure — show me the biggest opportunities']}
     ]
@@ -190,37 +191,92 @@ function packageRecommendations(isBusiness) {
   const stage = answers.stage || '';
   return [{name:'Entrepreneur Launch Foundations',why:'Helps validate the idea, shape the offer and establish the essential customer, finance and operating workflows before hiring.',price:'Choose business functions as your needs become clear: $200 setup + $20/month per function.'},{name:stage.includes('Already')?'Business Growth & Automation':'Founder AI Toolkit',why:'Adds practical AI-assisted workflows for marketing, sales, customer support and administration as the business needs them.',price:'$200 one-time setup + $20/month per selected function.'},{name:'Complete Donninger.AI Platform - Best Value',bundle:true,why:'Bring all eight business functions together as your business grows, with one connected package and one monthly subscription. Save $600 upfront and $60 every month compared with purchasing all eight individually.',price:'$1,000 one-time setup + $100/month for all eight functions. Third-party software and usage charges are separate where applicable.'}];
 }
-function renderFinalRecommendations(report,isBusiness) {
-  const packages = packageRecommendations(isBusiness);
-  const selectedFunctions = answers.functions || [];
-  const businessRecommendations = selectedFunctions.map((name,i) => {
-    const detail = functionDetails[name] || {task:'Review recurring workflows and identify suitable tasks'};
-    return '<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>'+escapeHtml(detail.task)+'. We will map this process to your existing tools, define the right approval points and configure a workflow around the way your team operates.</p>'+renderAutomationLink(name)+'</div></article>';
+function functionSlug(name) {
+  return ({
+    'Sales & lead generation':'sales',
+    'Marketing':'marketing',
+    'Customer service':'customer-service',
+    'Human resources & recruitment':'hr-recruitment',
+    'Finance & accounting':'finance',
+    'Operations & administration':'operations',
+    'Stock, suppliers & logistics':'stock-logistics',
+    'Management & reporting':'management'
+  })[name] || null;
+}
+function renderFunctionLinks(names,buttonLabel) {
+  return names.map((name,i)=>{
+    const slug=functionSlug(name);
+    return '<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>'+escapeHtml(functionDetails[name]?.task || 'Review the recurring workflows and controls in this area')+'.</p>'+(slug?'<a class="button button-primary report-explore-link" href="automation.html?function='+slug+'">'+escapeHtml(buttonLabel)+' <span aria-hidden="true">→</span></a><button type="button" class="button cart-add-button" data-cart-add="'+slug+'">Add to cart</button>':'')+'</div></article>';
   }).join('');
-  const savingsBlock = isBusiness
-    ? '<section class="report-section report-final"><h3>Your automation opportunity — and how we turn it into action</h3><p class="report-chart-intro">Your answers highlight the business functions where a tailored automation system could make day-to-day work simpler, more consistent and easier to manage. Rather than rely on generic savings promises, Donninger.AI starts by understanding your actual process, then scopes a practical solution around your team, tools and priorities.</p>'+
-      (businessRecommendations?'<div class="report-recommendations">'+businessRecommendations+'</div>':'<p class="report-field-note">Your next step is to identify the recurring process that causes the most friction. We can help map it into a clear first automation project.</p>')+
-      '<div class="report-total"><span>Your next step</span><strong>Get a tailored implementation plan</strong><small>We will review your priorities, confirm the workflow scope and agree where your team stays in control. Our published prices are $200 setup + $20/month per function, or $1,000 setup + $100/month for all eight functions. Any third-party software or usage charges will be explained separately before you commit.</small></div></section>'
-    : '<section class="report-section report-final"><h3>Recommended functions to automate first</h3><p class="report-chart-intro">As a founder, use AI and automation to support these functions before committing to a full team. Keep legal, financial and customer-critical decisions under appropriate human oversight.</p><div class="report-recommendations">'+((answers.support&&answers.support.length)?answers.support:['Marketing and finding customers','Sales and customer support','Finance, budgeting and accounting','Operations, suppliers and delivery','Website, technology and automation']).slice(0,5).map((name,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>Use lightweight AI tools and repeatable workflows to reduce founder admin; bring in a qualified person where specialist judgement or regulated advice is required.</p>'+renderAutomationLink(name)+'</div></article>').join('')+'</div></section>';
-  const packageBlock = '<section class="report-section report-final"><h3>Recommended Donninger.AI package</h3><p class="report-chart-intro">These recommendations are matched to the needs identified in your answers. We will confirm the exact scope before any implementation.</p><div class="package-recommendations">'+packages.map((item,i)=>'<article class="package-card '+(item.bundle?'package-card-bundle':'')+'"><span>'+(item.bundle?'BEST VALUE - ALL EIGHT FUNCTIONS':'RECOMMENDED '+(i+1))+'</span><strong>'+escapeHtml(item.name)+'</strong><p>'+escapeHtml(item.why)+'</p><small>'+escapeHtml(item.price)+'</small>'+(item.bundle?'<button type="button" class="button button-primary cart-add-button" data-cart-add-all>Add the complete bundle to cart</button>':'')+'</article>').join('')+'</div><p class="report-field-note">Monthly subscriptions include maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party software, messaging and AI usage charges are separate where applicable.</p><div class="report-bundle-prompt"><strong>Want the complete solution?</strong><span>Choose all eight functions for $1,000 setup + $100/month - save $600 upfront and $60 every month.</span><button type="button" class="button button-primary" data-cart-add-all>Add the all-functions bundle to cart</button></div></section>';
-  return savingsBlock+packageBlock;
+}
+function renderBusinessComparison(report) {
+  const requested=report.requestedFunctions||[];
+  const recommended=report.recommendedFunctions||[];
+  const overlap=requested.filter(name=>recommended.includes(name));
+  const additional=recommended.filter(name=>!requested.includes(name));
+  const notPrioritised=requested.filter(name=>!recommended.includes(name));
+  const list=(title,items,empty)=>'<div class="report-section"><h3>'+title+'</h3>'+(items.length?'<div class="report-recommendations">'+renderFunctionLinks(items,'Explore this function')+'</div>':'<p class="report-field-note">'+empty+'</p>')+'</div>';
+  return '<section class="report-section"><h3>Your priorities compared with our assessment</h3><p class="report-chart-intro">We have kept your preferences separate from our assessment. Areas you selected are not automatically treated as necessary; additional recommendations are based on the operational issues and goals you described.</p><div class="report-comparison-summary"><p><strong>'+overlap.length+'</strong> requested function(s) also appear in our recommendations.</p><p><strong>'+additional.length+'</strong> additional function(s) are recommended based on your answers.</p><p><strong>'+notPrioritised.length+'</strong> requested function(s) are not a first priority in this initial assessment.</p></div></section>'+
+    list('Functions you asked us to look at',requested,'You did not select any specific functions. We have based the proposal on the needs described in your answers.')+
+    list('Functions we recommend prioritising',recommended,'We do not yet have enough evidence to recommend a specific department. Start by mapping the most repetitive or disruptive workflow.')+
+    (additional.length?list('Additional opportunities we identified',additional,''):'')+
+    (notPrioritised.length?'<section class="report-section"><h3>Your requested functions we would defer for now</h3><p class="report-chart-intro">These are not rejected. Based on the information provided, we would investigate them after the higher-priority workflows, or revisit them if your priorities change.</p><div class="report-recommendations">'+renderFunctionLinks(notPrioritised,'Review this function')+'</div></section>':'');
+}
+function calculateBusinessProposal(report) {
+  const recommended=report.recommendedFunctions||[];
+  const count=recommended.length;
+  const requested=report.requestedFunctions||[];
+  const bundleSetup=1000, bundleMonthly=100;
+  const individualSetup=count*200, individualMonthly=count*20;
+  const bundleMakesFinancialSense=count>=5;
+  const recommendBundle=bundleMakesFinancialSense && (count>=6 || requested.length>=5);
+  const proposalFunctions=recommendBundle?8:count;
+  const setup=recommendBundle?bundleSetup:individualSetup;
+  const monthly=recommendBundle?bundleMonthly:individualMonthly;
+  const totalFirstYear=setup+monthly*12;
+  return {count,proposalFunctions,setup,monthly,totalFirstYear,individualSetup,individualMonthly,recommendBundle,bundleSetup,bundleMonthly};
+}
+function renderBusinessPricing(report) {
+  const p=calculateBusinessProposal(report);
+  const proposalName=p.recommendBundle?'Complete platform bundle':'Focused '+p.count+'-function proposal';
+  const comparison=p.count===0
+    ? 'We cannot responsibly price a recommended package until we identify a suitable first workflow.'
+    : p.recommendBundle
+      ? 'The bundle is better value for this proposal: it covers all eight functions for less than buying '+p.count+' recommended functions individually, and leaves room to expand.'
+      : p.count>=5
+        ? 'The bundle costs the same or less than buying the recommended functions individually. It is worth considering if you expect to use the additional functions; otherwise, start with the focused package.'
+        : 'The focused package is the more sensible starting point. The bundle would add functions you have not yet shown a need for, so we would not recommend paying for it solely because it is discounted.';
+  return '<section class="report-section report-final"><h3>Your proposed package and total cost</h3><div class="report-total"><span>'+escapeHtml(proposalName)+'</span><strong>$'+p.setup.toLocaleString()+' setup + $'+p.monthly+'/month</strong><small>'+(p.count?'Based on '+p.count+' function(s) we recommend prioritising. ':'')+'Estimated first 12 months: $'+p.totalFirstYear.toLocaleString()+', excluding third-party software, messaging and usage-based AI/API charges where applicable.</small></div><p class="report-chart-intro">'+escapeHtml(comparison)+'</p><div class="report-comparison-summary"><p><strong>Focused proposal:</strong> $'+p.individualSetup.toLocaleString()+' setup + $'+p.individualMonthly+'/month'+(p.count?' for '+p.count+' recommended functions':'')+'.</p><p><strong>All-eight bundle:</strong> $1,000 setup + $100/month. Save $600 upfront and $60/month compared with purchasing all eight separately.</p><p><strong>First-year bundle cost:</strong> $2,200. <strong>First-year focused proposal:</strong> $'+(p.individualSetup+p.individualMonthly*12).toLocaleString()+'.</p></div><p class="report-field-note">Our recommendation is based on suitability, not the largest sale. The monthly fee includes maintenance, support, upkeep and additions to the Donninger.AI product offering. Any third-party subscriptions, messaging charges or usage-based AI/API costs are separate and will be disclosed before commitment. Scope and integrations must be confirmed before implementation.</p>'+(p.recommendBundle?'<button type="button" class="button button-primary" data-cart-add-all>Add the recommended bundle to cart</button>':(p.count?'<div class="report-recommendations">'+report.recommendedFunctions.map(name=>'<div>'+renderAutomationLink(name)+'</div>').join('')+'</div>':''))+'</section>';
+}
+function renderFinalRecommendations(report,isBusiness) {
+  if (isBusiness) return renderBusinessComparison(report)+renderBusinessPricing(report);
+  const packages=packageRecommendations(false);
+  const packageBlock='<section class="report-section report-final"><h3>Recommended Donninger.AI package</h3><p class="report-chart-intro">These recommendations are matched to the needs identified in your answers. We will confirm the exact scope before any implementation.</p><div class="package-recommendations">'+packages.map((item,i)=>'<article class="package-card '+(item.bundle?'package-card-bundle':'')+'"><span>'+(item.bundle?'BEST VALUE - ALL EIGHT FUNCTIONS':'RECOMMENDED '+(i+1))+'</span><strong>'+escapeHtml(item.name)+'</strong><p>'+escapeHtml(item.why)+'</p><small>'+escapeHtml(item.price)+'</small>'+(item.bundle?'<button type="button" class="button button-primary cart-add-button" data-cart-add-all>Add the complete bundle to cart</button>':'')+'</article>').join('')+'</div></section>';
+  return packageBlock;
 }
 function buildBusinessReport() {
-  const functions = answers.functions || [];
-  const tasks = answers.tasks || [];
-  const recommendations = [];
-  const add = (title,body) => recommendations.push({title,body});
-  if (functions.includes('Sales & lead generation') || tasks.some(x=>x.includes('enquiries')||x.includes('leads'))) add('Lead response and sales follow-up','Create a consistent process to capture enquiries, send prompt replies, qualify leads and remind the team when a follow-up is due.');
-  if (functions.includes('Customer service') || tasks.some(x=>x.includes('customer questions'))) add('Customer service workflows','Use a structured knowledge base and assisted responses for common questions, with clear hand-off to a person when needed.');
-  if (functions.includes('Finance & accounting') || tasks.some(x=>x.includes('invoices')||x.includes('payments'))) add('Finance administration','Reduce repetitive invoice preparation, payment reminders and document handling while keeping approval and accounting controls in place.');
-  if (functions.includes('Human resources & recruitment') || tasks.some(x=>x.includes('recruitment')||x.includes('staff administration'))) add('HR and recruitment administration','Standardise candidate communication, interview scheduling, onboarding checklists and routine employee administration.');
-  if (functions.includes('Operations & administration') || tasks.some(x=>x.includes('systems')||x.includes('spreadsheets')||x.includes('reports'))) add('Connected operations and reporting','Connect the tools your team already uses, reduce duplicate data entry and automate routine status reports.');
-  if (functions.includes('Stock, suppliers & logistics') || tasks.some(x=>x.includes('stock')||x.includes('suppliers'))) add('Supplier, stock and order workflows','Improve order tracking, supplier follow-ups and low-stock notifications using consistent shared records.');
-  if (recommendations.length < 3) {
-    add('Map the highest-volume manual process','Choose one recurring task, document its current steps and measure how often it happens before selecting an automation.');
-    add('Connect your existing tools','Review where information is entered more than once and identify safe, reliable ways to connect those systems.');
+  const operating=answers.functions||[];
+  const requested=answers.interestedFunctions||[];
+  const tasks=answers.tasks||[];
+  const recommended=new Set();
+  const add=(name)=>recommended.add(name);
+  if (tasks.some(x=>x.includes('enquiries')||x.includes('leads')) || answers.goal==='Win more customers and respond faster') add('Sales & lead generation');
+  if (tasks.some(x=>x.includes('customer questions')) || answers.goal==='Improve customer experience') add('Customer service');
+  if (tasks.some(x=>x.includes('invoices')||x.includes('payments'))) add('Finance & accounting');
+  if (tasks.some(x=>x.includes('recruitment')||x.includes('staff administration'))) add('Human resources & recruitment');
+  if (tasks.some(x=>x.includes('systems')||x.includes('spreadsheets')||x.includes('reports')) || answers.goal==='Improve visibility, reporting and decisions') add('Management & reporting');
+  if (tasks.some(x=>x.includes('stock')||x.includes('suppliers'))) add('Stock, suppliers & logistics');
+  if (tasks.some(x=>x.includes('appointments')||x.includes('scheduling')||x.includes('Copying information')) || answers.goal==='Reduce admin and operating costs' || answers.goal==='Make the team more productive' || answers.goal==='Scale without immediately hiring more people') add('Operations & administration');
+  if (tasks.some(x=>x.includes('quotes')||x.includes('proposals')) && !recommended.has('Sales & lead generation')) add('Sales & lead generation');
+  if (operating.includes('Marketing') && (answers.goal==='Win more customers and respond faster' || tasks.some(x=>x.includes('spreadsheets')||x.includes('reports')))) add('Marketing');
+  if (requested.length && recommended.size===0) {
+    if (answers.goal==='Not sure — show me the biggest opportunities') add('Operations & administration');
+    else requested.slice(0,2).forEach(add);
   }
-  const goalMap = {
+  const recommendedFunctions=[...recommended];
+  const recommendations=recommendedFunctions.map(name=>({title:name,body:functionDetails[name]?.task || 'Review this function’s recurring workflows, tools and approval requirements.'}));
+  if (!recommendations.length) recommendations.push({title:'Map the highest-volume manual process',body:'Choose one recurring task, document its current steps and measure how often it happens before selecting an automation.'});
+  const goalMap={
     'Win more customers and respond faster':'Start with enquiry capture, lead qualification and follow-up speed.',
     'Reduce admin and operating costs':'Start with high-volume admin tasks that can be standardised and measured.',
     'Improve customer experience':'Start with response times, consistent service information and clear human hand-offs.',
@@ -229,19 +285,21 @@ function buildBusinessReport() {
     'Scale without immediately hiring more people':'Start with repeatable workflows that can handle more volume without adding the same amount of admin.',
     'Not sure — show me the biggest opportunities':'Start by measuring the time spent on the three most frequent manual tasks.'
   };
-  const company = answers.company ? answers.company+' — ' : '';
+  const company=answers.company?answers.company+' — ':'';
   return {
-    clientName:answers.company ? answers.company.trim() : '',
+    clientName:answers.company?answers.company.trim():'',
     title:company+'Automation opportunity overview',
-    summary:(answers.company ? 'Prepared for '+answers.company.trim()+'. ' : '')+'Based on your answers, '+(answers.industry||'your business')+' has a starting point for improving '+(answers.goal||'day-to-day operations').toLowerCase()+'.',
-    highlightLabel:'YOUR FIRST AUTOMATION PRIORITY',
-    highlight:recommendations[0]?.title || 'Map your highest-friction workflow',
-    highlightNote:'A tailored implementation begins with your real process, current software and team requirements. We confirm feasibility, integration access, approval controls and scope before quoting.',
+    summary:(answers.company?'Prepared for '+answers.company.trim()+'. ':'')+'Based on your answers, '+(answers.industry||'your business')+' should prioritise '+(recommendedFunctions.length?recommendedFunctions.slice(0,2).join(' and ').toLowerCase():'mapping its highest-friction workflow')+'. We have compared your requested functions with the needs indicated by your operational challenges and goals.',
+    highlightLabel:'OUR TOP RECOMMENDATION',
+    highlight:recommendations[0]?.title||'Map your highest-friction workflow',
+    highlightNote:'Recommendations are based on the operational challenges and goals you described, not simply on which packages you selected.',
     priorities:recommendations.slice(0,4),
-    chart:{items:functions.map(name=>({name,task:functionDetails[name]?.task || 'Review recurring workflows'}))},
-    growth:buildGrowthOpportunities(answers.goal,functions),
-    steps:[goalMap[answers.goal]||'Pick one high-volume manual workflow to examine first.','Map the current steps, tools involved, owners and approval points.','Configure a focused pilot and agree how success will be measured.','Review the pilot with your team before expanding to other departments.'],
-    disclaimer:'This is an initial, rules-based assessment based on the information you supplied. It identifies areas worth investigating; it does not promise a particular saving, performance improvement or financial result. Final scope depends on workflow suitability, software access, adoption and oversight.'
+    requestedFunctions:requested,
+    recommendedFunctions,
+    chart:{items:operating.map(name=>({name,task:functionDetails[name]?.task||'Review recurring workflows'}))},
+    growth:buildGrowthOpportunities(answers.goal,operating),
+    steps:[goalMap[answers.goal]||'Pick one high-volume manual workflow to examine first.','Compare your requested functions with the operational needs identified in this report.','Map the current steps, tools involved, owners and approval points.','Configure a focused pilot and agree how success will be measured before expanding.'],
+    disclaimer:'This is an initial, rules-based assessment based on the information you supplied. It is not a technical audit and does not promise savings or financial results. Recommendations should be validated against your actual workflows, software access, data quality, team capacity and applicable legal requirements.'
   };
 }
 function renderBusinessVisuals(report) {
