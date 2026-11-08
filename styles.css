@@ -470,3 +470,31 @@ body.assessment-open{overflow:hidden}
  .assessment-content{padding:0!important}
  .report-disclaimer{break-inside:avoid}
 }
+
+/* Business assessment report charts */
+.report-chart-intro{font-size:11px;line-height:1.65;color:#74849a;margin:7px 0 15px;max-width:650px}
+.report-chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.report-chart-card{min-width:0;padding:17px;border:1px solid #e2eaf3;border-radius:12px;background:linear-gradient(145deg,#fff,#f8fafd)}
+.report-chart-heading{display:grid;gap:4px;margin-bottom:17px}
+.report-chart-heading strong{font:700 13px 'Manrope';color:#1d3453}
+.report-chart-heading small{font-size:10px;color:#8a98aa}
+.report-donut-wrap{display:flex;align-items:center;gap:15px}
+.report-donut{width:132px;height:132px;flex:0 0 132px;border-radius:50%;display:grid;place-items:center;position:relative}
+.report-donut:before{content:"";position:absolute;inset:19px;border-radius:50%;background:#fff}
+.report-donut span{position:relative;text-align:center;font:700 10px/1.4 'Manrope';color:#29415f}
+.report-legend{display:grid;gap:8px;min-width:0}
+.report-legend-item{display:flex;align-items:flex-start;gap:7px;font-size:9px;line-height:1.4;color:#5e7088}
+.report-legend-item i{width:8px;height:8px;flex:0 0 8px;border-radius:3px;margin-top:2px}
+.report-bars{display:grid;gap:14px}
+.report-bar-row{display:grid;gap:6px}
+.report-bar-label{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;font-size:9px;line-height:1.4;color:#5c6e86}
+.report-bar-label strong{color:#294a70;white-space:nowrap;font-size:9px}
+.report-bar-track{height:8px;border-radius:20px;background:#eaf0f7;overflow:hidden}
+.report-bar-track i{display:block;height:100%;border-radius:20px}
+.growth-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:14px}
+.growth-card{padding:15px;border:1px solid #dceaf3;border-radius:10px;background:linear-gradient(145deg,#f6fbff,#f0f7fb)}
+.growth-card>span{display:block;font-size:8px;letter-spacing:1px;font-weight:800;color:#3478f6;margin-bottom:9px}
+.growth-card strong{display:block;font:700 12px/1.4 'Manrope';color:#1e3b5d}
+.growth-card p{font-size:10px;line-height:1.6;color:#718198;margin:7px 0 0}
+@media(max-width:650px){.report-chart-grid{grid-template-columns:1fr}.report-donut-wrap{justify-content:flex-start}.growth-grid{grid-template-columns:1fr}}
+@media print{.report-chart-card,.growth-card{break-inside:avoid}.report-donut{-webkit-print-color-adjust:exact;print-color-adjust:exact}.report-bar-track i{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
