@@ -138,41 +138,33 @@ function renderQuestion() {
   });
   document.getElementById('assessmentBack')?.addEventListener('click', () => { saveCurrentAnswer(); currentStep--; renderQuestion(); });
 }
-function renderEmailReportSection(report,isBusiness) {
-  return '<section class="report-section report-email-section"><div class="report-email-heading"><span class="assessment-kicker">A FORMAL COPY FOR YOUR RECORDS</span><h3>Receive your professional report by email</h3><p>We will send a branded report with your recommendations, package pricing, implementation priorities and a practical savings analysis.</p></div><form id="emailReportForm" class="email-report-form"><label for="reportEmail">Business email address</label><input id="reportEmail" name="email" type="email" autocomplete="email" required maxlength="254" placeholder="you@company.com"><div class="email-report-metrics"><div><label for="reportHours">Hours per week spent on repetitive tasks <span>(optional)</span></label><input id="reportHours" name="hours" type="number" min="0" max="10000" step="0.5" placeholder="e.g. 25"></div><div><label for="reportHourlyCost">Approximate staff cost per hour (USD) <span>(optional)</span></label><input id="reportHourlyCost" name="hourlyCost" type="number" min="0" max="100000" step="0.5" placeholder="e.g. 18"></div></div><p class="email-report-note">If you provide both figures, the report will show illustrative 25%, 50% and 75% time-saving scenarios. These are planning scenarios, not promised results. We will not estimate savings if the required figures are missing.</p><label class="email-report-consent"><input type="checkbox" name="consent" required><span>I agree to Donninger.AI using these details to prepare and email my requested report. I understand these details will be used to prepare and email this report.</span></label><button class="button button-primary" type="submit" id="sendEmailReport">Email me my formal report <span>→</span></button><p class="email-report-status" id="emailReportStatus" role="status" aria-live="polite"></p></form></section>';
+function renderDownloadReportSection() {
+  return '<section class="report-section report-download-section"><div class="report-email-heading"><span class="assessment-kicker">YOUR REPORT · READY TO KEEP</span><h3>Download your professional report</h3><p>Save a polished copy of this assessment, including your recommendations, pricing breakdown and next steps. Add optional workload figures to include an illustrative savings analysis.</p></div><form id="downloadReportForm" class="email-report-form"><div class="email-report-metrics"><div><label for="reportHours">Hours per week spent on repetitive tasks <span>(optional)</span></label><input id="reportHours" name="hours" type="number" min="0.1" max="10000" step="0.5" placeholder="e.g. 25"></div><div><label for="reportHourlyCost">Approximate staff cost per hour (USD) <span>(optional)</span></label><input id="reportHourlyCost" name="hourlyCost" type="number" min="0.01" max="100000" step="0.5" placeholder="e.g. 18"></div></div><p class="email-report-note">Provide both figures to include 25%, 50% and 75% time-saving scenarios. These show potential staff capacity value, not guaranteed cash savings.</p><button class="button button-primary" type="submit">Download report as PDF <span>↓</span></button><p class="email-report-status" id="downloadReportStatus" role="status" aria-live="polite">Your browser will open its print window. Choose “Save as PDF” as the destination.</p></form></section>';
 }
-function emailReportPayload(report,isBusiness,form) {
-  const count=(report.recommendedFunctions||[]).length;
-  const bundle=count>=6 && ((report.requestedFunctions||[]).length>=5 || count>=6);
-  const setup=count===0?0:(bundle?1000:count*200);
-  const monthly=count===0?0:(bundle?100:count*20);
-  return {
-    title:report.title,summary:report.summary,highlight:report.highlight,
-    priorities:report.priorities||[],steps:report.steps||[],disclaimer:report.disclaimer,
-    clientName:report.clientName||'',industry:answers.industry||'',assessmentType:isBusiness?'Business Automation Assessment':'Entrepreneurship Assessment',
-    requestedFunctions:report.requestedFunctions||[],recommendedFunctions:report.recommendedFunctions||[],
-    setup:isBusiness?(count===0?null:setup):null,monthly:isBusiness?(count===0?null:monthly):null,firstYear:isBusiness&&count>0?setup+monthly*12:null,bundleRecommended:bundle,
-    hoursPerWeek:form.elements.hours.value===''?null:Number(form.elements.hours.value),
-    hourlyCost:form.elements.hourlyCost.value===''?null:Number(form.elements.hourlyCost.value)
-  };
-}
-function bindEmailReport(report,isBusiness) {
-  const form=document.getElementById('emailReportForm');
+function bindDownloadReport() {
+  const form=document.getElementById('downloadReportForm');
   if(!form)return;
-  form.addEventListener('submit',async event=>{
+  form.addEventListener('submit',event=>{
     event.preventDefault();
-    const button=document.getElementById('sendEmailReport');
-    const status=document.getElementById('emailReportStatus');
-    if(!form.reportValidity())return;
-    button.disabled=true;button.textContent='Preparing your report…';status.textContent='Sending your report securely. This may take a moment.';
-    try{
-      const response=await fetch('/api/reports/email',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:form.elements.email.value.trim(),consent:form.elements.consent.checked,report:emailReportPayload(report,isBusiness,form)})});
-      const result=await response.json();
-      if(!response.ok)throw new Error(result.error||'We could not send your report right now.');
-      status.textContent='Your report has been emailed. Please check your inbox.';
-      form.reset();
-    }catch(error){status.textContent=error.message||'Something went wrong. Please try again.';}
-    finally{button.disabled=false;button.innerHTML='Email me my formal report <span>→</span>';}
+    const hours=form.elements.hours.value===''?null:Number(form.elements.hours.value);
+    const cost=form.elements.hourlyCost.value===''?null:Number(form.elements.hourlyCost.value);
+    if((hours===null)!==(cost===null)){
+      document.getElementById('downloadReportStatus').textContent='Please enter both figures to include the savings analysis, or leave both blank.';
+      return;
+    }
+    let analysis=document.getElementById('reportSavingsAnalysis');
+    if(hours!==null&&cost!==null){
+      const rows=[25,50,75].map(percent=>{
+        const weekly=hours*percent/100;
+        const annual=weekly*cost*52;
+        return '<tr><td>'+percent+'% scenario</td><td>'+weekly.toFixed(1)+' hours</td><td>$'+annual.toLocaleString('en-US',{maximumFractionDigits:0})+'</td></tr>';
+      }).join('');
+      const html='<section class="report-section report-savings-analysis" id="reportSavingsAnalysis"><h3>Illustrative time and cost scenarios</h3><p>Based on '+hours+' hours per week spent on repetitive tasks and an estimated staff cost of $'+cost.toFixed(2)+' per hour.</p><table class="report-savings-table"><thead><tr><th>Scenario</th><th>Time released / week</th><th>Annual capacity value</th></tr></thead><tbody>'+rows+'</tbody></table><p class="report-field-note">These scenarios estimate the value of staff capacity potentially released. They are not guaranteed cash savings, payroll reductions or promised results. Actual outcomes depend on the workflows selected, implementation, adoption and how released time is used.</p></section>';
+      if(analysis)analysis.outerHTML=html;
+      else form.insertAdjacentHTML('beforebegin',html);
+    }else if(analysis){analysis.remove();}
+    document.getElementById('downloadReportStatus').textContent='In the print window, select “Save as PDF” to download your report.';
+    window.print();
   });
 }
 function renderReport() {
@@ -187,11 +179,11 @@ function renderReport() {
     '<div class="report-section"><h3>Your next steps</h3><ol class="report-next-steps">'+report.steps.map(item=>'<li>'+escapeHtml(item)+'</li>').join('')+'</ol></div>'+
     renderFinalRecommendations(report,isBusiness)+
     '<section class="report-section report-notes"><h3>Important assessment notes</h3><p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p></section>'+
-    renderEmailReportSection(report,isBusiness)+
+    renderDownloadReportSection()+
     '<div class="assessment-actions report-actions"><button class="assessment-back" type="button" id="assessmentRestart">Start again</button><button class="button button-primary" type="button" id="assessmentPrint">Print / Save report <span>↗</span></button></div>';
   document.getElementById('assessmentRestart').addEventListener('click',()=>{currentStep=0;answers={};renderQuestion();});
   document.getElementById('assessmentPrint').addEventListener('click',()=>window.print());
-  bindEmailReport(report,isBusiness);
+  bindDownloadReport();
 }
 const functionDetails = {
   'Sales & lead generation': {task:'Lead capture, qualification, follow-up reminders and quote preparation'},
