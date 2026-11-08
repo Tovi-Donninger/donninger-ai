@@ -184,7 +184,7 @@ function packageRecommendations(isBusiness) {
   if (isBusiness) {
     const selected = answers.functions || [];
     const count = selected.length;
-    if (count === 8) return [{name:'Complete Donninger.AI Platform',why:'All eight business functions, configured as one connected operating platform. Includes ongoing maintenance, support, upkeep and additions to the Donninger.AI product offering.',price:'$1,000 one-time setup + $100/month. Third-party software and usage charges are separate where applicable.'}];
+    if (count === 8) return [{name:'Complete Donninger.AI Platform',why:'All eight business functions, configured as one connected operating platform. Save $600 on setup and $60 per month compared with buying all eight separately. Includes ongoing maintenance, support, upkeep and additions to the Donninger.AI product offering.',price:'$1,000 one-time setup + $100/month. Third-party software and usage charges are separate where applicable.'}];
     if (count > 0) return [{name:count+'-Function Automation Package',why:'A focused implementation covering the '+count+' business function'+(count===1?'':'s')+' you selected, with agreed workflows, integrations and human approval controls.',price:'$'+(count*200)+' one-time setup + $'+(count*20)+'/month. Add all eight functions for the $1,000 setup + $100/month platform bundle.'}];
     return [{name:'Choose your first automation',why:'Select the business functions you want Donninger.AI to support. You can add more at any time.',price:'$200 one-time setup + $20/month per function.'}];
   }
