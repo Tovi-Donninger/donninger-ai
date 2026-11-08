@@ -939,3 +939,55 @@ body.cart-open{overflow:hidden}
  .report-section,.report-highlight,.report-total,.package-card,.growth-card{break-inside:avoid}
  .report-savings-table{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+
+/* Professional assessment report layout */
+.report-section{margin:28px 0;padding:24px 26px;border:1px solid #e0e8ee;border-radius:14px;background:#fff;box-shadow:0 8px 24px rgba(21,43,65,.045)}
+.report-section>h3{font:800 19px/1.3 'Manrope',sans-serif;letter-spacing:-.45px;color:#203951;margin:0 0 10px}
+.report-chart-intro{font-size:11px;line-height:1.7;color:#718296;margin:0 0 17px}
+.report-topline{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
+.report-date{font-size:10px;color:#8392a2}
+.report-summary-panel{padding:18px 20px;border-left:4px solid #269f93;border-radius:8px;background:linear-gradient(110deg,#edf8f6,#f5f8fc)}
+.report-summary-panel>strong{display:block;font:800 16px 'Manrope';color:#203951}
+.report-summary-panel p{font-size:11px;color:#65798e;line-height:1.6;margin:8px 0}
+.report-summary-panel small{font-size:10px;color:#168477}
+.report-customer-wants{border-top:4px solid #4b83bb}
+.report-our-recommendations{border-top:4px solid #159889}
+.report-opportunities{border-top:4px solid #d39a45}
+.report-customer-wants .report-recommendations article>span{background:#eaf2fb;color:#3e73aa}
+.report-our-recommendations .report-recommendations article>span{background:#e7f6f2;color:#138b7e}
+.report-opportunities .report-recommendations article>span{background:#fbf2e5;color:#a8752b}
+.report-pricing-table-wrap{overflow-x:auto;border:1px solid #e2e9ee;border-radius:10px}
+.report-pricing-table{width:100%;border-collapse:collapse;font-size:11px;min-width:520px}
+.report-pricing-table th{padding:12px 13px;text-align:left;background:#203951;color:#fff;font-size:9px;letter-spacing:.5px}
+.report-pricing-table td{padding:13px;border-bottom:1px solid #e7edf1;color:#344d64}
+.report-pricing-table tr:last-child td{border-bottom:0}
+.report-pricing-table td:first-child{display:table-cell}
+.report-pricing-table td strong,.report-pricing-table td small{display:block}
+.report-pricing-table td small{font-size:9px;color:#8291a0;margin-top:4px}
+.report-pricing-table td:not(:first-child){font-weight:800;white-space:nowrap}
+.report-pricing-table tbody tr:last-child{background:#f0f9f6}
+.report-cost-chart{margin:18px 0;padding:17px 18px;border:1px solid #e3eaf0;border-radius:10px;background:#f8fafc}
+.report-cost-chart-heading{display:flex;justify-content:space-between;gap:10px;margin-bottom:14px}
+.report-cost-chart-heading strong{font:800 11px 'Manrope';color:#263f58}
+.report-cost-chart-heading span{font-size:9px;color:#8493a2}
+.report-cost-bar-row{display:grid;grid-template-columns:75px 1fr 76px;align-items:center;gap:10px;margin:12px 0}
+.report-cost-bar-row>span{font-size:10px;color:#61758a}
+.report-cost-bar-row>div{height:11px;border-radius:20px;background:#e7edf2;overflow:hidden}
+.report-cost-bar-row>div i{display:block;height:100%;border-radius:20px;background:linear-gradient(90deg,#4a83bd,#64a8d5)}
+.report-cost-bar-row.bundle>div i{background:linear-gradient(90deg,#169889,#62c5ae)}
+.report-cost-bar-row>b{text-align:right;font-size:10px;color:#29455e}
+.report-pricing-recommendation{margin:16px 0 10px;padding:13px 15px;border-radius:8px;background:#edf5fb;color:#365b7a;font-size:11px;line-height:1.6}
+.report-pricing-savings{display:grid;gap:4px;margin:12px 0;padding:14px 16px;border:1px solid #c8e8df;border-radius:9px;background:#eff9f5}
+.report-pricing-savings strong{font:800 11px 'Manrope';color:#176f64}
+.report-pricing-savings span{font-size:10px;color:#54766f}
+.report-section .report-recommendations{margin-top:12px}
+.report-section .report-recommendations article{padding:13px 0;border-bottom:1px solid #edf1f4}
+.report-section .report-recommendations article:last-child{border-bottom:0}
+@media(max-width:600px){.report-section{padding:19px 16px}.report-cost-chart-heading{flex-direction:column}.report-cost-bar-row{grid-template-columns:62px 1fr 66px;gap:7px}}
+@media print{
+ .report-section{box-shadow:none;border-color:#dce4ea}
+ .report-customer-wants,.report-our-recommendations,.report-opportunities{break-inside:avoid}
+ .report-pricing-table th{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ .report-cost-chart,.report-pricing-savings,.report-pricing-recommendation{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
