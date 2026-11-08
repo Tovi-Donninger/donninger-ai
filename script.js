@@ -178,7 +178,7 @@ function automationSlugForRecommendation(label) {
 function renderAutomationLink(label) {
   const slug = automationSlugForRecommendation(label);
   if (!slug) return '';
-  return '<a class="button button-primary report-explore-link" href="automation.html?function='+slug+'">Explore this automation <span aria-hidden="true">→</span></a>';
+  return '<a class="button button-primary report-explore-link" href="automation.html?function='+slug+'">Explore this automation <span aria-hidden="true">→</span></a><button type="button" class="button cart-add-button" data-cart-add="'+slug+'">Add to cart</button>';
 }
 function packageRecommendations(isBusiness) {
   if (isBusiness) {
