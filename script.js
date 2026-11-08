@@ -139,38 +139,16 @@ function renderQuestion() {
   document.getElementById('assessmentBack')?.addEventListener('click', () => { saveCurrentAnswer(); currentStep--; renderQuestion(); });
 }
 function renderDownloadReportSection() {
-  return '<section class="report-section report-download-section"><div class="report-email-heading"><span class="assessment-kicker">YOUR REPORT · READY TO KEEP</span><h3>Download your professional report</h3><p>Save a polished copy of this assessment, including your recommendations, pricing breakdown and next steps. Add optional workload figures to include an illustrative savings analysis.</p></div><form id="downloadReportForm" class="email-report-form"><div class="email-report-metrics"><div><label for="reportHours">Hours per week spent on repetitive tasks <span>(optional)</span></label><input id="reportHours" name="hours" type="number" min="0.1" max="10000" step="0.5" placeholder="e.g. 25"></div><div><label for="reportHourlyCost">Approximate staff cost per hour (USD) <span>(optional)</span></label><input id="reportHourlyCost" name="hourlyCost" type="number" min="0.01" max="100000" step="0.5" placeholder="e.g. 18"></div></div><p class="email-report-note">Provide both figures to include 25%, 50% and 75% time-saving scenarios. These show potential staff capacity value, not guaranteed cash savings.</p><button class="button button-primary" type="submit">Download report as PDF <span>↓</span></button><p class="email-report-status" id="downloadReportStatus" role="status" aria-live="polite">Your browser will open its print window. Choose “Save as PDF” as the destination.</p></form></section>';
+  return '<section class="report-download-section"><div><span class="assessment-kicker">DONNINGER.AI · YOUR REPORT</span><h3>Your report is ready</h3><p>Save a PDF copy of your assessment and recommendations.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Save report as PDF <span>↓</span></button></section>';
 }
 function bindDownloadReport() {
-  const form=document.getElementById('downloadReportForm');
-  if(!form)return;
-  form.addEventListener('submit',event=>{
-    event.preventDefault();
-    const hours=form.elements.hours.value===''?null:Number(form.elements.hours.value);
-    const cost=form.elements.hourlyCost.value===''?null:Number(form.elements.hourlyCost.value);
-    if((hours===null)!==(cost===null)){
-      document.getElementById('downloadReportStatus').textContent='Please enter both figures to include the savings analysis, or leave both blank.';
-      return;
-    }
-    let analysis=document.getElementById('reportSavingsAnalysis');
-    if(hours!==null&&cost!==null){
-      const rows=[25,50,75].map(percent=>{
-        const weekly=hours*percent/100;
-        const annual=weekly*cost*52;
-        return '<tr><td>'+percent+'% scenario</td><td>'+weekly.toFixed(1)+' hours</td><td>$'+annual.toLocaleString('en-US',{maximumFractionDigits:0})+'</td></tr>';
-      }).join('');
-      const html='<section class="report-section report-savings-analysis" id="reportSavingsAnalysis"><h3>Illustrative time and cost scenarios</h3><p>Based on '+hours+' hours per week spent on repetitive tasks and an estimated staff cost of $'+cost.toFixed(2)+' per hour.</p><table class="report-savings-table"><thead><tr><th>Scenario</th><th>Time released / week</th><th>Annual capacity value</th></tr></thead><tbody>'+rows+'</tbody></table><p class="report-field-note">These scenarios estimate the value of staff capacity potentially released. They are not guaranteed cash savings, payroll reductions or promised results. Actual outcomes depend on the workflows selected, implementation, adoption and how released time is used.</p></section>';
-      if(analysis)analysis.outerHTML=html;
-      else form.insertAdjacentHTML('beforebegin',html);
-    }else if(analysis){analysis.remove();}
-    document.getElementById('downloadReportStatus').textContent='In the print window, select “Save as PDF” to download your report.';
-    window.print();
-  });
+  document.getElementById('downloadReportPdf')?.addEventListener('click',()=>window.print());
 }
+
 function renderReport() {
   const isBusiness = activeAssessment === assessments.business;
   const report = isBusiness ? buildBusinessReport() : buildFounderReport();
-  const intro = '<div class="report-topline"><span class="assessment-kicker">YOUR DONNINGER.AI REPORT'+(isBusiness && report.clientName ? ' · PREPARED FOR '+escapeHtml(report.clientName) : '')+'</span><span class="report-date">'+new Date().toLocaleDateString()+'</span></div>'+
+  const intro = '<div class="report-document-brand"><span class="report-brand-mark">D.</span><div><strong>DONNINGER.AI</strong><small>BUSINESS AUTOMATION & GROWTH</small></div><span class="report-document-label">CONFIDENTIAL ASSESSMENT</span></div><div class="report-topline"><span class="assessment-kicker">YOUR DONNINGER.AI REPORT'+(isBusiness && report.clientName ? ' · PREPARED FOR '+escapeHtml(report.clientName) : '')+'</span><span class="report-date">'+new Date().toLocaleDateString()+'</span></div>'+
     '<h2 id="assessmentTitle">'+escapeHtml(report.title)+'</h2>'+
     '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>';
   const businessSections = isBusiness
