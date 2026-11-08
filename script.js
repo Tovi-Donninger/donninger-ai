@@ -149,7 +149,7 @@ function renderReport() {
     '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>'+
     '<div class="report-highlight"><span>'+escapeHtml(report.highlightLabel)+'</span><strong>'+escapeHtml(report.highlight)+'</strong><small>'+escapeHtml(report.highlightNote)+'</small></div>'+
     (isBusiness ? renderBusinessVisuals(report) : '')+
-    '<div class="report-section"><h3>Your priority areas</h3><div class="report-recommendations">'+report.priorities.map((item,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></div></article>').join('')+'</div></div>'+
+    '<div class="report-section"><h3>Your priority areas</h3><div class="report-recommendations">'+report.priorities.map((item,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p>'+renderAutomationLink(item.title)+'</div></article>').join('')+'</div></div>'+
     '<div class="report-section"><h3>Your next steps</h3><ol class="report-next-steps">'+report.steps.map(item=>'<li>'+escapeHtml(item)+'</li>').join('')+'</ol></div>'+
     renderFinalRecommendations(report,isBusiness)+
     '<p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p>'+
@@ -191,6 +191,23 @@ function calculateSavings() {
   }).sort((a,b)=>(rate?b.value-a.value:b.savedHours-a.savedHours));
   return {rows,totalHours:rows.reduce((n,row)=>n+row.savedHours,0),totalValue:rows.reduce((n,row)=>n+row.value,0),hasBreakdown,currency,rate,money};
 }
+function automationSlugForRecommendation(label) {
+  const value = String(label || '').toLowerCase();
+  if (/sales|lead|customer acquisition|first sale/.test(value)) return 'sales';
+  if (/marketing|campaign|content/.test(value)) return 'marketing';
+  if (/customer service|customer support|customer experience|customer question/.test(value)) return 'customer-service';
+  if (/human resources|\bhr\b|recruit|employee|onboarding|staff administration/.test(value)) return 'hr-recruitment';
+  if (/finance|accounting|budget|invoice|payment/.test(value)) return 'finance';
+  if (/stock|supplier|logistics|order|delivery|fulfilment/.test(value)) return 'stock-logistics';
+  if (/management|report|kpi|performance dashboard|business intelligence/.test(value)) return 'management';
+  if (/operations|administration|workflow|business process|technology|website/.test(value)) return 'operations';
+  return null;
+}
+function renderAutomationLink(label) {
+  const slug = automationSlugForRecommendation(label);
+  if (!slug) return '';
+  return '<a class="button button-primary report-explore-link" href="automation.html?function='+slug+'">Explore this automation <span aria-hidden="true">→</span></a>';
+}
 function packageRecommendations(isBusiness) {
   if (isBusiness) {
     const selected = answers.functions || [];
@@ -206,13 +223,13 @@ function packageRecommendations(isBusiness) {
 function renderFinalRecommendations(report,isBusiness) {
   const savings = isBusiness ? calculateSavings() : null;
   const packages = packageRecommendations(isBusiness);
-  const rows = savings ? savings.rows.map((row,i)=>'<tr><td><strong>'+escapeHtml(row.name)+'</strong><small>'+escapeHtml(row.task)+'</small></td><td>'+(i===0?'High':i===1?'Medium':'Next phase')+'</td><td>'+row.weekly.toFixed(1)+' hrs</td><td>'+row.savedHours.toFixed(0)+' hrs</td><td>'+(savings.rate?savings.money(row.value):'Add hourly cost')+'</td></tr>').join('') : '';
+  const rows = savings ? savings.rows.map((row,i)=>'<tr><td><strong>'+escapeHtml(row.name)+'</strong><small>'+escapeHtml(row.task)+'</small>'+renderAutomationLink(row.name)+'</td><td>'+(i===0?'High':i===1?'Medium':'Next phase')+'</td><td>'+row.weekly.toFixed(1)+' hrs</td><td>'+row.savedHours.toFixed(0)+' hrs</td><td>'+(savings.rate?savings.money(row.value):'Add hourly cost')+'</td></tr>').join('') : '';
   const total = savings ? (savings.rate?savings.money(savings.totalValue)+'/ year':savings.totalHours.toFixed(0)+' hours / year') : '';
   const savingsBlock = isBusiness
     ? '<section class="report-section report-final"><h3>Recommended automation & estimated savings</h3><p class="report-chart-intro">'+(savings.hasBreakdown?'Based on the weekly hours you allocated to each selected function.':'You did not allocate hours by function, so the total weekly admin estimate has been distributed using an illustrative planning model. Update the hours for a more accurate result.')+' We model 20–30% time reduction depending on the workflow; figures are estimates, not guaranteed cash savings.</p>'+
       (rows?'<div class="report-table-wrap"><table class="report-savings-table"><thead><tr><th>Function & tasks to automate</th><th>Suggested priority</th><th>Hours / week</th><th>Hours saved / year</th><th>Potential labour value / year</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="report-field-note">We need weekly hours for at least one function to estimate savings. Your next step is to measure the repetitive work in each department.</p>')+
       '<div class="report-total"><span>Estimated annual opportunity</span><strong>'+(savings.rate?total:total+' potentially reclaimed')+'</strong><small>'+(savings.rate?'Based on your hourly cost input. This is labour capacity value, not necessarily a reduction in cash payroll.':'Enter an average hourly labour cost to translate the time opportunity into an estimated monetary value.')+'</small></div></section>'
-    : '<section class="report-section report-final"><h3>Recommended functions to automate first</h3><p class="report-chart-intro">As a founder, use AI and automation to support these functions before committing to a full team. Keep legal, financial and customer-critical decisions under appropriate human oversight.</p><div class="report-recommendations">'+((answers.support&&answers.support.length)?answers.support:['Marketing and finding customers','Sales and customer support','Finance, budgeting and accounting','Operations, suppliers and delivery','Website, technology and automation']).slice(0,5).map((name,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>Use lightweight AI tools and repeatable workflows to reduce founder admin; bring in a qualified person where specialist judgement or regulated advice is required.</p></div></article>').join('')+'</div></section>';
+    : '<section class="report-section report-final"><h3>Recommended functions to automate first</h3><p class="report-chart-intro">As a founder, use AI and automation to support these functions before committing to a full team. Keep legal, financial and customer-critical decisions under appropriate human oversight.</p><div class="report-recommendations">'+((answers.support&&answers.support.length)?answers.support:['Marketing and finding customers','Sales and customer support','Finance, budgeting and accounting','Operations, suppliers and delivery','Website, technology and automation']).slice(0,5).map((name,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>Use lightweight AI tools and repeatable workflows to reduce founder admin; bring in a qualified person where specialist judgement or regulated advice is required.</p>'+renderAutomationLink(name)+'</div></article>').join('')+'</div></section>';
   const packageBlock = '<section class="report-section report-final"><h3>Recommended Donninger.AI package</h3><p class="report-chart-intro">These recommendations are matched to the needs identified in your answers. We will confirm the exact scope before any implementation.</p><div class="package-recommendations">'+packages.map((item,i)=>'<article class="package-card"><span>RECOMMENDED '+(i+1)+'</span><strong>'+escapeHtml(item.name)+'</strong><p>'+escapeHtml(item.why)+'</p><small>'+escapeHtml(item.price)+'</small></article>').join('')+'</div><p class="report-field-note">Package prices have not yet been finalised. We show a tailored quote rather than inventing a fee; the final proposal will state the one-time setup price and ongoing monthly cost before you commit.</p></section>';
   return savingsBlock+packageBlock;
 }
