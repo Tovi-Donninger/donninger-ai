@@ -28,6 +28,7 @@ const assessments = {
       {id:'industry',title:'Which industry best describes your business?',type:'select',required:true,options:['Professional services','Home services / trades','Retail / e-commerce','Healthcare / wellness','Hospitality / food','Technology / software','Manufacturing / logistics','Education / training','Real estate','Other']},
       {id:'team',title:'How many people work in the business?',type:'select',required:true,options:['Just me','2–5','6–15','16–50','51–200','More than 200']},
       {id:'functions',title:'Which parts of the business do you currently operate?',hint:'Select all that apply.',type:'checks',required:true,options:['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting']},
+      {id:'functionHours',title:'Roughly how many hours per week does each area take?',hint:'Enter your best estimate for each selected function. Leave blank if unsure; we will clearly label any fallback estimates.',type:'functionHours'},
       {id:'tasks',title:'Where does your team spend too much time on repetitive work?',hint:'Choose any that sound familiar.',type:'checks',options:['Responding to enquiries and following up leads','Preparing quotes, proposals or invoices','Copying information between systems','Scheduling appointments, jobs or staff','Updating spreadsheets and reports','Answering common customer questions','Recruitment, onboarding or staff administration','Chasing payments and overdue accounts','Managing stock, orders or suppliers','We are not sure yet']},
       {id:'hours',title:'Approximately how many team hours are spent on repetitive admin each week?',hint:'A rough estimate is fine. Enter 0 if you are unsure.',type:'number',required:true,min:0,max:10000,placeholder:'e.g. 25'},
       {id:'currency',title:'Which currency should we use in your report?',hint:'Choose the currency you use for staff costs and financial planning.',type:'select',required:true,options:['USD — US Dollar','EUR — Euro','GBP — British Pound','ILS — Israeli New Shekel','ZAR — South African Rand','CAD — Canadian Dollar','AUD — Australian Dollar','NZD — New Zealand Dollar','AED — UAE Dirham','SGD — Singapore Dollar','INR — Indian Rupee','JPY — Japanese Yen','CHF — Swiss Franc','SEK — Swedish Krona','NOK — Norwegian Krone','DKK — Danish Krone','BRL — Brazilian Real','MXN — Mexican Peso']},
@@ -79,6 +80,12 @@ document.querySelectorAll('[data-assessment]').forEach(button => button.addEvent
 
 function controlMarkup(q) {
   const value = answers[q.id];
+  if (q.type === 'functionHours') {
+    const selected = answers.functions || [];
+    if (!selected.length) return '<p class="assessment-field-note">Select the business functions in the previous question to add hours here.</p>';
+    const saved = value || {};
+    return '<div class="function-hours-grid">'+selected.map(name=>'<label class="function-hours-field"><span>'+escapeHtml(name)+'</span><div><input type="number" min="0" max="10000" step="any" data-function-hours="'+escapeHtml(name)+'" value="'+escapeHtml(saved[name]??'')+'" placeholder="Hours / week"><small>hours per week</small></div></label>').join('')+'</div>';
+  }
   if (q.type === 'select') {
     return '<select id="assessmentAnswer" name="answer" '+(q.required?'required':'')+'><option value="">Choose an option</option>'+q.options.map(option => '<option '+(value===option?'selected':'')+' value="'+escapeHtml(option)+'">'+escapeHtml(option)+'</option>').join('')+'</select>';
   }
@@ -91,6 +98,14 @@ function controlMarkup(q) {
 }
 function saveCurrentAnswer() {
   const q = activeAssessment.questions[currentStep];
+  if (q.type === 'functionHours') {
+    const values = {};
+    modalContent.querySelectorAll('[data-function-hours]').forEach(input => {
+      if (input.value.trim() !== '') values[input.dataset.functionHours] = Math.max(0, Number(input.value));
+    });
+    answers.functionHours = values;
+    return true;
+  }
   if (q.type === 'checks') {
     answers[q.id] = [...modalContent.querySelectorAll('input[name="answer"]:checked')].map(input => input.value);
     if (q.required && !answers[q.id].length) return false;
@@ -136,10 +151,70 @@ function renderReport() {
     (isBusiness ? renderBusinessVisuals(report) : '')+
     '<div class="report-section"><h3>Your priority areas</h3><div class="report-recommendations">'+report.priorities.map((item,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(item.title)+'</strong><p>'+escapeHtml(item.body)+'</p></div></article>').join('')+'</div></div>'+
     '<div class="report-section"><h3>Your next steps</h3><ol class="report-next-steps">'+report.steps.map(item=>'<li>'+escapeHtml(item)+'</li>').join('')+'</ol></div>'+
+    renderFinalRecommendations(report,isBusiness)+
     '<p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p>'+
     '<div class="assessment-actions report-actions"><button class="assessment-back" type="button" id="assessmentRestart">Start again</button><button class="button button-primary" type="button" id="assessmentPrint">Print / Save report <span>↗</span></button></div>';
   document.getElementById('assessmentRestart').addEventListener('click',()=>{currentStep=0;answers={};renderQuestion();});
   document.getElementById('assessmentPrint').addEventListener('click',()=>window.print());
+}
+const functionDetails = {
+  'Sales & lead generation': {task:'Lead capture, qualification, follow-up reminders and quote preparation',rate:.25},
+  'Marketing': {task:'Campaign scheduling, content repurposing, lead routing and performance reporting',rate:.2},
+  'Customer service': {task:'Common-question responses, ticket sorting, appointment updates and service follow-ups',rate:.3},
+  'Human resources & recruitment': {task:'CV organisation, candidate updates, interview scheduling and onboarding checklists',rate:.25},
+  'Finance & accounting': {task:'Invoice preparation, receipt capture, payment reminders and reconciliations for human approval',rate:.2},
+  'Operations & administration': {task:'Data entry, document generation, task routing and recurring reports',rate:.3},
+  'Stock, suppliers & logistics': {task:'Order status updates, supplier reminders and low-stock alerts',rate:.2},
+  'Management & reporting': {task:'KPI collation, dashboard updates and recurring management reports',rate:.2}
+};
+function calculateSavings() {
+  const selected = answers.functions || [];
+  const entered = answers.functionHours || {};
+  const totalHours = Number(answers.hours || 0);
+  const hasBreakdown = selected.some(name => Number(entered[name]) > 0);
+  const allocated = {};
+  if (hasBreakdown) {
+    selected.forEach(name => allocated[name] = Number(entered[name] || 0));
+  } else if (selected.length && totalHours > 0) {
+    const weights = selected.map(name => ({name,weight:(functionDetails[name]?.rate || .2)}));
+    const sum = weights.reduce((n,item)=>n+item.weight,0);
+    weights.forEach(item=>allocated[item.name] = totalHours*item.weight/sum);
+  }
+  const currency = (answers.currency || 'USD — US Dollar').slice(0,3);
+  const rate = Number(answers.hourlyCost || 0);
+  const money = value => new Intl.NumberFormat(undefined,{style:'currency',currency,maximumFractionDigits:0}).format(value);
+  const rows = selected.filter(name=>allocated[name]>0).map(name=>{
+    const detail = functionDetails[name] || {task:'Review recurring workflows and identify suitable tasks',rate:.2};
+    const weekly = allocated[name];
+    const savedHours = weekly*detail.rate*46;
+    return {name,task:detail.task,weekly,savedHours,value:rate?savedHours*rate:0,rate:detail.rate};
+  });
+  return {rows,totalHours:rows.reduce((n,row)=>n+row.savedHours,0),totalValue:rows.reduce((n,row)=>n+row.value,0),hasBreakdown,currency,rate,money};
+}
+function packageRecommendations(isBusiness) {
+  if (isBusiness) {
+    const selected = answers.functions || [];
+    const broad = selected.length >= 4 || selected.includes('Management & reporting');
+    const specialist = selected.includes('Finance & accounting') || selected.includes('Human resources & recruitment') || selected.includes('Stock, suppliers & logistics');
+    if (broad) return [{name:'Business Operations & Automation',why:'Your answers point to several departments and connected workflows that should be assessed together.',price:'Setup fee and monthly support: custom quote after a workflow review.'},{name:'Automation Starter',why:'A sensible first phase if you prefer to prove value with one or two workflows before expanding.',price:'Setup fee and monthly support: custom quote after scoping.'}];
+    if (specialist) return [{name:'Department Automation',why:'A focused implementation for the specialist functions you selected, with appropriate human approval points.',price:'Setup fee and monthly support: custom quote after scoping.'}];
+    return [{name:'Automation Starter',why:'A focused first implementation for the highest-priority repetitive workflows identified in this assessment.',price:'Setup fee and monthly support: custom quote after scoping.'}];
+  }
+  const stage = answers.stage || '';
+  return [{name:'Entrepreneur Launch Foundations',why:'Helps validate the idea, shape the offer and establish the essential customer, finance and operating workflows before hiring.',price:'Project setup and ongoing support: custom quote based on your launch scope.'},{name:stage.includes('Already')?'Business Growth & Automation':'Founder AI Toolkit',why:'Adds practical AI-assisted workflows for marketing, sales, customer support and administration as the business needs them.',price:'Setup fee and monthly support: custom quote after scoping.'}];
+}
+function renderFinalRecommendations(report,isBusiness) {
+  const savings = isBusiness ? calculateSavings() : null;
+  const packages = packageRecommendations(isBusiness);
+  const rows = savings ? savings.rows.map(row=>'<tr><td><strong>'+escapeHtml(row.name)+'</strong><small>'+escapeHtml(row.task)+'</small></td><td>'+row.weekly.toFixed(1)+' hrs</td><td>'+row.savedHours.toFixed(0)+' hrs</td><td>'+(savings.rate?savings.money(row.value):'Add hourly cost')+'</td></tr>').join('') : '';
+  const total = savings ? (savings.rate?savings.money(savings.totalValue)+'/ year':savings.totalHours.toFixed(0)+' hours / year') : '';
+  const savingsBlock = isBusiness
+    ? '<section class="report-section report-final"><h3>Recommended automation & estimated savings</h3><p class="report-chart-intro">'+(savings.hasBreakdown?'Based on the weekly hours you allocated to each selected function.':'You did not allocate hours by function, so the total weekly admin estimate has been distributed using an illustrative planning model. Update the hours for a more accurate result.')+' We model 20–30% time reduction depending on the workflow; figures are estimates, not guaranteed cash savings.</p>'+
+      (rows?'<div class="report-table-wrap"><table class="report-savings-table"><thead><tr><th>Function & tasks to automate</th><th>Hours / week</th><th>Hours saved / year</th><th>Potential labour value / year</th></tr></thead><tbody>'+rows+'</tbody></table></div>':'<p class="report-field-note">We need weekly hours for at least one function to estimate savings. Your next step is to measure the repetitive work in each department.</p>')+
+      '<div class="report-total"><span>Estimated annual opportunity</span><strong>'+(savings.rate?total:total+' potentially reclaimed')+'</strong><small>'+(savings.rate?'Based on your hourly cost input. This is labour capacity value, not necessarily a reduction in cash payroll.':'Enter an average hourly labour cost to translate the time opportunity into an estimated monetary value.')+'</small></div></section>'
+    : '<section class="report-section report-final"><h3>Recommended functions to automate first</h3><p class="report-chart-intro">As a founder, use AI and automation to support these functions before committing to a full team. Keep legal, financial and customer-critical decisions under appropriate human oversight.</p><div class="report-recommendations">'+(answers.support||[]).slice(0,5).map((name,i)=>'<article><span>0'+(i+1)+'</span><div><strong>'+escapeHtml(name)+'</strong><p>Use lightweight AI tools and repeatable workflows to reduce founder admin; bring in a qualified person where specialist judgement or regulated advice is required.</p></div></article>').join('')+'</div></section>';
+  const packageBlock = '<section class="report-section report-final"><h3>Recommended Donninger.AI package</h3><p class="report-chart-intro">These recommendations are matched to the needs identified in your answers. We will confirm the exact scope before any implementation.</p><div class="package-recommendations">'+packages.map((item,i)=>'<article class="package-card"><span>RECOMMENDED '+(i+1)+'</span><strong>'+escapeHtml(item.name)+'</strong><p>'+escapeHtml(item.why)+'</p><small>'+escapeHtml(item.price)+'</small></article>').join('')+'</div><p class="report-field-note">Package prices have not yet been finalised. We show a tailored quote rather than inventing a fee; the final proposal will state the one-time setup price and ongoing monthly cost before you commit.</p></section>';
+  return savingsBlock+packageBlock;
 }
 function buildBusinessReport() {
   const hours = Number(answers.hours || 0);
