@@ -54,8 +54,55 @@ async function readSession(request, secret) {
 function cookie(token, maxAge) {
   return SESSION_COOKIE + "=" + token + "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=" + maxAge;
 }
+const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbymKnZtBunB4bAFlawNumQ9c96x-hiYesFbcnOdTHcsohN06DXz22wSDcxoEN1EZoq8/exec";
+async function handleReportSend(request, env) {
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405);
+  const origin = request.headers.get("Origin");
+  if (origin && origin !== new URL(request.url).origin) return json({ error: "Request origin not allowed." }, 403);
+  if (!env.DONNINGER_EMAIL_TOKEN) return json({ error: "Email service is not configured. Add the DONNINGER_EMAIL_TOKEN Worker secret." }, 503);
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > 8 * 1024 * 1024) return json({ error: "The report is too large to email." }, 413);
+  const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+  const rateKey = new Request("https://donninger-email-rate-limit.invalid/" + encodeURIComponent(ip));
+  try {
+    const cached = await caches.default.match(rateKey);
+    const count = cached ? Number(await cached.text()) : 0;
+    if (count >= 3) return json({ error: "Too many reports have been sent from this connection. Please try again in 10 minutes." }, 429);
+    await caches.default.put(rateKey, new Response(String(count + 1), { headers: { "Cache-Control": "max-age=600" } }));
+  } catch (error) {
+    console.error("Email rate-limit check failed:", error);
+  }
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
+  const email = String(body.email || "").trim();
+  const pdfBase64 = String(body.pdfBase64 || "");
+  const filename = String(body.filename || "Assessment-Report.pdf").replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 100);
+  const businessName = String(body.businessName || "your business").slice(0, 120);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Please enter a valid email address." }, 400);
+  if (!pdfBase64 || pdfBase64.length > 7 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(pdfBase64)) return json({ error: "The PDF attachment is missing or too large." }, 400);
+  try {
+    const upstream = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: env.DONNINGER_EMAIL_TOKEN, email, pdfBase64, filename, businessName }),
+      redirect: "follow"
+    });
+    const text = await upstream.text();
+    let result;
+    try { result = JSON.parse(text); } catch { result = null; }
+    if (!upstream.ok || !result || result.success !== true) {
+      console.error("Apps Script email service response:", upstream.status, text.slice(0, 500));
+      return json({ error: result?.message || "The email service did not confirm delivery. Please try again." }, 502);
+    }
+    return json({ success: true, message: "Your assessment report has been emailed." });
+  } catch (error) {
+    console.error("Report email request failed:", error);
+    return json({ error: "The email service could not be reached. Please try again." }, 502);
+  }
+}
 async function handleApi(request, env) {
   const url = new URL(request.url);
+  if (url.pathname === "/api/reports/send") return handleReportSend(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     if (!env.DEV_ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Development authentication is not configured. Add the required Worker secrets in Cloudflare." }, 503);
     if (!env.DEV_ADMIN_ENABLED || env.DEV_ADMIN_ENABLED !== "true") return json({ error: "Development administrator access is disabled." }, 403);
