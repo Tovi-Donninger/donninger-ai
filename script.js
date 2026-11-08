@@ -139,7 +139,7 @@ function renderQuestion() {
   document.getElementById('assessmentBack')?.addEventListener('click', () => { saveCurrentAnswer(); currentStep--; renderQuestion(); });
 }
 function renderDownloadReportSection() {
-  return '<section class="report-download-section"><div><span class="report-download-kicker"><span>DONNINGER.AI</span><span class="report-kicker-separator">·</span><span>YOUR REPORT</span></span><h3>Your report is ready</h3><p>Download a professionally formatted, editable PDF. The page design stays fixed when you edit its fields.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Download editable PDF <span>↓</span></button></section>';
+  return '<section class="report-download-section"><div><span class="report-download-kicker"><span>DONNINGER.AI</span><span class="report-kicker-separator">·</span><span>YOUR REPORT</span></span><h3>Your report is ready</h3><p>Download a professionally formatted PDF with a consistent four-page layout.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Download PDF <span>↓</span></button></section>';
 }
 let pdfLibraryPromise;
 function loadPdfLibrary() {
@@ -164,16 +164,15 @@ function pdfFilename(report) {
     .normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').slice(0,55);
   return (base||'Donninger-AI-Assessment')+'-Editable-Report.pdf';
 }
-async function createEditableAssessmentPdf(report,isBusiness) {
+async function createAssessmentPdf(report,isBusiness) {
   const PDFLib=await loadPdfLibrary();
   const {PDFDocument,StandardFonts,rgb}=PDFLib;
   const pdf=await PDFDocument.create();
   pdf.setTitle((report.title||'Donninger.AI Assessment')+' | Donninger.AI');
   pdf.setAuthor('Donninger.AI');
-  pdf.setSubject('Editable business assessment report');
+  pdf.setSubject('Donninger.AI assessment report');
   const regular=await pdf.embedFont(StandardFonts.Helvetica);
   const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
-  const form=pdf.getForm();
   const W=595.28,H=841.89,LEFT=48,RIGHT=547,CONTENT=499;
   const ink=rgb(.12,.22,.32),muted=rgb(.39,.47,.55),teal=rgb(.10,.52,.48),pale=rgb(.94,.97,.98),line=rgb(.85,.89,.92),white=rgb(1,1,1);
   const drawText=(page,text,x,top,size=9,font=regular,color=ink)=>{
@@ -187,22 +186,37 @@ async function createEditableAssessmentPdf(report,isBusiness) {
     page.drawRectangle({x:LEFT,y:H-top-23,width:CONTENT,height:1,color:line});
   };
   const addField=(page,name,value,x,top,width,height,opts={})=>{
-    const field=form.createTextField('report_'+name.replace(/[^a-z0-9_]/gi,'_'));
-    field.enableMultiline();
-    const max=opts.maxLength||Math.max(80,Math.floor(width*height/(opts.fontSize||9)*.72));
-    field.setMaxLength(max);
-    field.setText(safePdfText(value,max));
-    field.addToPage(page,{
-      x,y:H-top-height,width,height,
-      font:opts.bold?bold:regular,
-      fontSize:opts.fontSize||9,
-      textColor:opts.color||ink,
-      borderColor:line,
-      backgroundColor:white,
-      borderWidth:.65,
-      margin:5
+    const size=opts.fontSize||9;
+    const font=opts.bold?bold:regular;
+    const max=opts.maxLength||Math.max(80,Math.floor(width*height/size*.65));
+    const raw=safePdfText(value,max);
+    const padding=opts.padding??7;
+    const maxWidth=width-padding*2;
+    const lineHeight=size*1.42;
+    const lines=[];
+    String(raw).split(/\\n/).forEach(paragraph=>{
+      const words=paragraph.split(/\\s+/).filter(Boolean);
+      if(!words.length){lines.push('');return;}
+      let lineText='';
+      words.forEach(word=>{
+        const candidate=lineText?lineText+' '+word:word;
+        if(font.widthOfTextAtSize(candidate,size)<=maxWidth){lineText=candidate;return;}
+        if(lineText) lines.push(lineText);
+        lineText=word;
+      });
+      if(lineText) lines.push(lineText);
     });
-    return field;
+    const maxLines=Math.max(1,Math.floor((height-padding*2)/lineHeight));
+    const visible=lines.slice(0,maxLines);
+    if(lines.length>maxLines&&visible.length){
+      let last=visible[visible.length-1];
+      while(last.length>1&&font.widthOfTextAtSize(last+'…',size)>maxWidth) last=last.slice(0,-1);
+      visible[visible.length-1]=last+'…';
+    }
+    page.drawRectangle({x,y:H-top-height,width,height,color:white,borderColor:line,borderWidth:.65});
+    visible.forEach((lineText,i)=>{
+      if(lineText) page.drawText(lineText,{x:x+padding,y:H-top-padding-size-i*lineHeight,size,font,color:opts.color||ink});
+    });
   };
   const addLabel=(page,label,x,top)=>{
     page.drawText(label.toUpperCase(),{x,y:H-top-7,size:7,font:bold,color:muted});
@@ -258,21 +272,35 @@ async function createEditableAssessmentPdf(report,isBusiness) {
     const p2=addPage('Business function comparison',2);
     heading(p2,'Your business at a glance',100);
     drawText(p2,'A comparison of what is currently in place, what you asked to automate and what the assessment recommends exploring.',LEFT,132,8,regular,muted);
-    const cols=[LEFT,LEFT+235,LEFT+322,LEFT+410], widths=[225,80,80,89];
-    const tableTop=164,rowH=38;
-    rect(p2,LEFT,tableTop,CONTENT,31,ink,ink);
-    ['BUSINESS FUNCTION','CURRENT','YOUR CHOICE','OUR VIEW'].forEach((t,i)=>p2.drawText(t,{x:cols[i]+6,y:H-tableTop-20,size:6.5,font:bold,color:white}));
+    const tableX=LEFT,tableTop=164,rowH=36;
+    const colWidths=[220,82,94,103];
+    const colX=[tableX,tableX+colWidths[0],tableX+colWidths[0]+colWidths[1],tableX+colWidths[0]+colWidths[1]+colWidths[2]];
+    rect(p2,tableX,tableTop,CONTENT,34,ink,ink);
+    const headerLabels=['BUSINESS FUNCTION','IN PLACE','REQUESTED','RECOMMENDED'];
+    headerLabels.forEach((label,i)=>{
+      const size=i===0?7:6.3;
+      const textWidth=bold.widthOfTextAtSize(label,size);
+      const x=i===0?colX[i]+9:colX[i]+(colWidths[i]-textWidth)/2;
+      p2.drawText(label,{x,y:H-tableTop-22,size,font:bold,color:white});
+    });
     const all=['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting'];
     all.forEach((name,i)=>{
-      const top=tableTop+31+i*rowH;
-      rect(p2,LEFT,top,CONTENT,rowH,i%2?white:pale,line);
-      p2.drawText(name,{x:LEFT+7,y:H-top-23,size:7.3,font:bold,color:ink});
-      const values=[
-        (answers.functions||[]).includes(name)?'Current':'—',
-        (report.requestedFunctions||[]).includes(name)?'Selected':'—',
-        (report.recommendedFunctions||[]).includes(name)?'Recommended':'—'
+      const top=tableTop+34+i*rowH;
+      rect(p2,tableX,top,CONTENT,rowH,i%2?white:pale,line);
+      p2.drawText(name,{x:tableX+9,y:H-top-22,size:7.5,font:bold,color:ink});
+      const statuses=[
+        (answers.functions||[]).includes(name),
+        (report.requestedFunctions||[]).includes(name),
+        (report.recommendedFunctions||[]).includes(name)
       ];
-      values.forEach((v,j)=>addField(p2,'comparison_'+i+'_'+j,v,cols[j+1]+4,top+7,widths[j+1]-8,23,{fontSize:7,maxLength:30}));
+      statuses.forEach((active,j)=>{
+        const x=colX[j+1],w=colWidths[j+1];
+        const label=active?'YES':'—';
+        const color=active?(j===2?teal:ink):muted;
+        if(active) p2.drawRectangle({x:x+14,y:H-(top+9)-18,width:w-28,height:18,color:j===2?rgb(.87,.95,.93):rgb(.91,.94,.96)});
+        const tw=bold.widthOfTextAtSize(label,7);
+        p2.drawText(label,{x:x+(w-tw)/2,y:H-top-21,size:7,font:bold,color});
+      });
     });
     heading(p2,'What you asked us to consider',526);
     addField(p2,'requested_functions',(report.requestedFunctions||[]).join(' • ')||'No specific functions selected.',LEFT,558,CONTENT,60,{fontSize:9,maxLength:400});
@@ -305,9 +333,6 @@ async function createEditableAssessmentPdf(report,isBusiness) {
     const count=(report.recommendedFunctions||[]).length;
     const individualSetup=count*200,individualMonthly=count*20;
     const useBundle=count>=6;
-    const focusedSetup=useBundle?1000:individualSetup;
-    const focusedMonthly=useBundle?100:individualMonthly;
-    const focusedFirst=focusedSetup+focusedMonthly*12;
     const tableY=143;
     const headers=[['PACKAGE',LEFT+6],['SETUP',LEFT+260],['MONTHLY',LEFT+330],['FIRST YEAR',LEFT+415]];
     rect(p4,LEFT,tableY,CONTENT,30,ink,ink);
@@ -329,8 +354,8 @@ async function createEditableAssessmentPdf(report,isBusiness) {
     addField(p4,'pricing_terms','Each individual function is $200 one-time setup plus $20 per month. The complete eight-function bundle is $1,000 setup plus $100 per month. The monthly fee covers maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Implementation scope and integrations are confirmed before work begins.',LEFT,413,CONTENT,108,{fontSize:8,maxLength:900});
     heading(p4,'Important assessment notes',546);
     addField(p4,'disclaimer',report.disclaimer||'This assessment is an initial opportunity review and does not guarantee savings or financial results.',LEFT,579,CONTENT,100,{fontSize:8,maxLength:800});
-    addField(p4,'editable_client_notes','Add your own notes here…',LEFT,704,CONTENT,64,{fontSize:8,maxLength:400});
-    addLabel(p4,'Additional notes (editable)',LEFT,692);
+    addField(p4,'client_notes','',LEFT,704,CONTENT,64,{fontSize:8,maxLength:400});
+    addLabel(p4,'Additional information',LEFT,692);
   } else {
     const p2=addPage('Your priorities',2);
     heading(p2,'What you told us',100);
@@ -358,9 +383,8 @@ async function createEditableAssessmentPdf(report,isBusiness) {
     heading(p4,'Important assessment notes',282);
     addField(p4,'founder_disclaimer',report.disclaimer||'This is an initial planning report, not professional advice.',LEFT,315,CONTENT,120,{fontSize:9,maxLength:800});
     heading(p4,'Your editable notes',466);
-    addField(p4,'founder_editable_notes','Add your own notes, questions and decisions here…',LEFT,499,CONTENT,180,{fontSize:9,maxLength:1200});
+    addField(p4,'founder_notes','',LEFT,499,CONTENT,180,{fontSize:9,maxLength:1200});
   }
-  form.updateFieldAppearances(regular);
   const bytes=await pdf.save();
   const blob=new Blob([bytes],{type:'application/pdf'});
   const url=URL.createObjectURL(blob);
@@ -376,7 +400,7 @@ function bindDownloadReport() {
     const isBusiness=activeAssessment===assessments.business;
     const original=button.innerHTML;
     button.disabled=true; button.textContent='Preparing your PDF…';
-    try { await createEditableAssessmentPdf(report,isBusiness); button.textContent='PDF downloaded'; }
+    try { await createAssessmentPdf(report,isBusiness); button.textContent='PDF downloaded'; }
     catch(error) { console.error(error); button.textContent='Download failed'; window.alert(error.message||'The PDF could not be created. Please try again.'); }
     finally { setTimeout(()=>{button.disabled=false;button.innerHTML=original;},1800); }
   }));
@@ -393,7 +417,7 @@ function renderReport() {
   modalContent.innerHTML = intro+businessSections+
     '<section class="report-section report-notes"><h3>Important assessment notes</h3><p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p></section>'+
     renderDownloadReportSection()+
-    '<div class="assessment-actions report-actions"><button class="assessment-back" type="button" id="assessmentRestart">Start again</button><button class="button button-primary" type="button" id="assessmentPrint">Download editable PDF <span>↓</span></button></div>';
+    '<div class="assessment-actions report-actions"><button class="assessment-back" type="button" id="assessmentRestart">Start again</button><button class="button button-primary" type="button" id="assessmentPrint">Download PDF <span>↓</span></button></div>';
   document.getElementById('assessmentRestart').addEventListener('click',()=>{currentStep=0;answers={};renderQuestion();});
   
   bindDownloadReport();
