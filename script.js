@@ -139,12 +139,248 @@ function renderQuestion() {
   document.getElementById('assessmentBack')?.addEventListener('click', () => { saveCurrentAnswer(); currentStep--; renderQuestion(); });
 }
 function renderDownloadReportSection() {
-  return '<section class="report-download-section"><div><span class="report-download-kicker"><span>DONNINGER.AI</span><span class="report-kicker-separator">·</span><span>YOUR REPORT</span></span><h3>Your report is ready</h3><p>Save a PDF copy of your assessment and recommendations.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Save report as PDF <span>↓</span></button></section>';
+  return '<section class="report-download-section"><div><span class="report-download-kicker"><span>DONNINGER.AI</span><span class="report-kicker-separator">·</span><span>YOUR REPORT</span></span><h3>Your report is ready</h3><p>Download a professionally formatted, editable PDF. The page design stays fixed when you edit its fields.</p></div><button class="button button-primary" type="button" id="downloadReportPdf">Download editable PDF <span>↓</span></button></section>';
+}
+let pdfLibraryPromise;
+function loadPdfLibrary() {
+  if (window.PDFLib) return Promise.resolve(window.PDFLib);
+  if (!pdfLibraryPromise) pdfLibraryPromise = new Promise((resolve,reject) => {
+    const script=document.createElement('script');
+    script.src='https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js';
+    script.async=true;
+    script.onload=()=>window.PDFLib?resolve(window.PDFLib):reject(new Error('The PDF library did not load.'));
+    script.onerror=()=>reject(new Error('Could not load the PDF generator. Check your internet connection and try again.'));
+    document.head.appendChild(script);
+  });
+  return pdfLibraryPromise;
+}
+function safePdfText(value,max=900) {
+  const text=String(value??'').replace(/\s+/g,' ').trim();
+  if (text.length<=max) return text;
+  return text.slice(0,Math.max(0,max-1)).trimEnd()+'…';
+}
+function pdfFilename(report) {
+  const base=(report.clientName||report.title||'Donninger-AI-Assessment').toString()
+    .normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').slice(0,55);
+  return (base||'Donninger-AI-Assessment')+'-Editable-Report.pdf';
+}
+async function createEditableAssessmentPdf(report,isBusiness) {
+  const PDFLib=await loadPdfLibrary();
+  const {PDFDocument,StandardFonts,rgb}=PDFLib;
+  const pdf=await PDFDocument.create();
+  pdf.setTitle((report.title||'Donninger.AI Assessment')+' | Donninger.AI');
+  pdf.setAuthor('Donninger.AI');
+  pdf.setSubject('Editable business assessment report');
+  const regular=await pdf.embedFont(StandardFonts.Helvetica);
+  const bold=await pdf.embedFont(StandardFonts.HelveticaBold);
+  const form=pdf.getForm();
+  const W=595.28,H=841.89,LEFT=48,RIGHT=547,CONTENT=499;
+  const ink=rgb(.12,.22,.32),muted=rgb(.39,.47,.55),teal=rgb(.10,.52,.48),pale=rgb(.94,.97,.98),line=rgb(.85,.89,.92),white=rgb(1,1,1);
+  const drawText=(page,text,x,top,size=9,font=regular,color=ink)=>{
+    page.drawText(String(text??''),{x,y:H-top-size,size,font,color,maxWidth:CONTENT});
+  };
+  const rect=(page,x,top,width,height,fill=pale,border=line)=>{
+    page.drawRectangle({x,y:H-top-height,width,height,color:fill,borderColor:border,borderWidth:.7});
+  };
+  const heading=(page,text,top)=>{
+    page.drawText(text,{x:LEFT,y:H-top-17,size:15,font:bold,color:ink});
+    page.drawRectangle({x:LEFT,y:H-top-23,width:CONTENT,height:1,color:line});
+  };
+  const addField=(page,name,value,x,top,width,height,opts={})=>{
+    const field=form.createTextField('report_'+name.replace(/[^a-z0-9_]/gi,'_'));
+    field.enableMultiline();
+    const max=opts.maxLength||Math.max(80,Math.floor(width*height/(opts.fontSize||9)*.72));
+    field.setMaxLength(max);
+    field.setText(safePdfText(value,max));
+    field.addToPage(page,{
+      x,y:H-top-height,width,height,
+      font:opts.bold?bold:regular,
+      fontSize:opts.fontSize||9,
+      textColor:opts.color||ink,
+      borderColor:line,
+      backgroundColor:white,
+      borderWidth:.65,
+      margin:5
+    });
+    return field;
+  };
+  const addLabel=(page,label,x,top)=>{
+    page.drawText(label.toUpperCase(),{x,y:H-top-7,size:7,font:bold,color:muted});
+  };
+  const addHeader=(page,section,pageNo)=>{
+    page.drawRectangle({x:0,y:H-9,width:W,height:9,color:teal});
+    page.drawText('D.',{x:LEFT,y:H-48,size:24,font:bold,color:teal});
+    page.drawText('DONNINGER.AI',{x:LEFT+34,y:H-35,size:10,font:bold,color:ink});
+    page.drawText('BUSINESS AUTOMATION & GROWTH',{x:LEFT+34,y:H-47,size:6,font:regular,color:muted});
+    page.drawText('CONFIDENTIAL ASSESSMENT',{x:405,y:H-38,size:6,font:bold,color:muted});
+    page.drawRectangle({x:LEFT,y:H-60,width:CONTENT,height:1.2,color:ink});
+    page.drawText(section.toUpperCase(),{x:LEFT,y:H-78,size:7,font:bold,color:teal,characterSpacing:.7});
+    page.drawRectangle({x:LEFT,y:35,width:CONTENT,height:.7,color:line});
+    page.drawText('DONNINGER.AI  ·  CONFIDENTIAL',{x:LEFT,y:21,size:6,font:bold,color:muted});
+    page.drawText('PAGE '+pageNo+' OF 4',{x:500,y:21,size:6,font:bold,color:muted});
+  };
+  const addPage=(section,pageNo)=>{
+    const page=pdf.addPage([W,H]); addHeader(page,section,pageNo); return page;
+  };
+  const company=answers.company||report.clientName||'Not provided';
+  const industry=answers.industry||'Not provided';
+  const team=answers.team||'Not provided';
+  const goal=answers.goal||'Not specified';
+  const date=new Date().toLocaleDateString();
+  const title=report.title|| (isBusiness?'Business automation assessment':'Entrepreneurship assessment');
+  const methodology=isBusiness
+    ? 'This report is based on the business details, existing functions, automation interests, repetitive tasks and primary goal supplied in the assessment. We compared the requested areas with the operational signals in your answers. Recommendations are rules-based indicators for further discovery; they are not the result of an AI technical audit.'
+    : 'This report is based on the business idea, market, stage, expected customer, revenue model, resources and support areas supplied in the assessment. The roadmap prioritises validation and practical next steps. It is an initial planning aid, not professional legal, tax or financial advice.';
+  const p1=addPage('Assessment overview',1);
+  drawText(p1,'YOUR PERSONALised REPORT'.toUpperCase(),LEFT,100,8,bold,teal);
+  addField(p1,'report_title',title,LEFT,118,CONTENT,48,{fontSize:16,bold:true,maxLength:180});
+  addLabel(p1,'Prepared for',LEFT,184);
+  addField(p1,'client_name',company,LEFT,196,CONTENT,28,{fontSize:10,bold:true,maxLength:100});
+  addLabel(p1,'Industry / sector',LEFT,238);
+  addField(p1,'industry',industry,LEFT,250,CONTENT,27,{maxLength:100});
+  if(isBusiness){
+    addLabel(p1,'Team size',LEFT,292); addField(p1,'team_size',team,LEFT,304,CONTENT,27,{maxLength:70});
+    addLabel(p1,'Primary business goal',LEFT,346); addField(p1,'business_goal',goal,LEFT,358,CONTENT,42,{maxLength:180});
+  } else {
+    addLabel(p1,'Business stage',LEFT,292); addField(p1,'business_stage',answers.stage||'Not provided',LEFT,304,CONTENT,27,{maxLength:100});
+    addLabel(p1,'Expected customer',LEFT,346); addField(p1,'target_customer',answers.customer||'Not provided',LEFT,358,CONTENT,42,{maxLength:150});
+  }
+  heading(p1,'Executive summary',425);
+  addField(p1,'executive_summary',report.summary||'Your assessment summary will appear here.',LEFT,458,CONTENT,88,{fontSize:10,maxLength:700});
+  heading(p1,'How to use this report',572);
+  addField(p1,'report_guidance',isBusiness
+    ? 'Review the comparison and recommendations, confirm that the suggested workflows match how your business actually operates, and use the pricing page as an initial proposal. All implementation scope, integrations and third-party costs must be confirmed before work begins.'
+    : 'Use the priorities and roadmap as a starting point. Validate demand with real customers, confirm local legal and regulatory requirements, and update this document as your business plan develops.',LEFT,605,CONTENT,112,{fontSize:9,maxLength:800});
+  addField(p1,'report_date',date,LEFT,746,CONTENT,22,{fontSize:8,maxLength:40});
+  addLabel(p1,'Report date',LEFT,735);
+
+  if(isBusiness){
+    const p2=addPage('Business function comparison',2);
+    heading(p2,'Your business at a glance',100);
+    drawText(p2,'A comparison of what is currently in place, what you asked to automate and what the assessment recommends exploring.',LEFT,132,8,regular,muted);
+    const cols=[LEFT,LEFT+235,LEFT+322,LEFT+410], widths=[225,80,80,89];
+    const tableTop=164,rowH=38;
+    rect(p2,LEFT,tableTop,CONTENT,31,ink,ink);
+    ['BUSINESS FUNCTION','CURRENT','YOUR CHOICE','OUR VIEW'].forEach((t,i)=>p2.drawText(t,{x:cols[i]+6,y:H-tableTop-20,size:6.5,font:bold,color:white}));
+    const all=['Sales & lead generation','Marketing','Customer service','Human resources & recruitment','Finance & accounting','Operations & administration','Stock, suppliers & logistics','Management & reporting'];
+    all.forEach((name,i)=>{
+      const top=tableTop+31+i*rowH;
+      rect(p2,LEFT,top,CONTENT,rowH,i%2?white:pale,line);
+      p2.drawText(name,{x:LEFT+7,y:H-top-23,size:7.3,font:bold,color:ink});
+      const values=[
+        (answers.functions||[]).includes(name)?'Current':'—',
+        (report.requestedFunctions||[]).includes(name)?'Selected':'—',
+        (report.recommendedFunctions||[]).includes(name)?'Recommended':'—'
+      ];
+      values.forEach((v,j)=>addField(p2,'comparison_'+i+'_'+j,v,cols[j+1]+4,top+7,widths[j+1]-8,23,{fontSize:7,maxLength:30}));
+    });
+    heading(p2,'What you asked us to consider',526);
+    addField(p2,'requested_functions',(report.requestedFunctions||[]).join(' • ')||'No specific functions selected.',LEFT,558,CONTENT,60,{fontSize:9,maxLength:400});
+    heading(p2,'What the assessment recommends',635);
+    addField(p2,'recommended_functions',(report.recommendedFunctions||[]).join(' • ')||'No paid function is recommended yet. Map a repetitive workflow before selecting a package.',LEFT,667,CONTENT,95,{fontSize:9,maxLength:600});
+
+    const p3=addPage('Recommendations & opportunities',3);
+    heading(p3,'Recommended areas to investigate',100);
+    const recs=report.recommendedFunctions||[];
+    const recList=recs.length?recs.map((name,i)=>(i+1)+'. '+name+': '+(functionDetails[name]?.task||'Review the current workflow, tools, ownership and approval requirements.')).join('\n\n'):'No specific paid function is recommended from the information currently available. Start by mapping one repetitive workflow and confirming its frequency, tools, owner and approval steps.';
+    addField(p3,'recommendation_detail',recList,LEFT,133,CONTENT,235,{fontSize:9,maxLength:1800});
+    heading(p3,'Growth opportunities',397);
+    const growth=(report.growth||[]);
+    const growthText=growth.length?growth.map((g,i)=>(i+1)+'. '+g.title+': '+g.body).join('\n\n'):'No additional growth opportunities were identified from the answers supplied.';
+    addField(p3,'growth_opportunities',growthText,LEFT,430,CONTENT,150,{fontSize:9,maxLength:1100});
+    heading(p3,'How we reached these findings',609);
+    const methodText=[
+      answers.company?'Business: '+answers.company:'',
+      answers.industry?'Industry: '+answers.industry:'',
+      answers.team?'Team size: '+answers.team:'',
+      'Current functions: '+((answers.functions||[]).join(', ')||'Not specified'),
+      'Tasks highlighted: '+((answers.tasks||[]).join(', ')||'Not specified'),
+      'Primary goal: '+goal,
+      methodology
+    ].filter(Boolean).join('\n');
+    addField(p3,'methodology',methodText,LEFT,642,CONTENT,126,{fontSize:7.5,maxLength:1100});
+
+    const p4=addPage('Pricing & important information',4);
+    heading(p4,'Indicative pricing breakdown',100);
+    const count=(report.recommendedFunctions||[]).length;
+    const individualSetup=count*200,individualMonthly=count*20;
+    const useBundle=count>=6;
+    const focusedSetup=useBundle?1000:individualSetup;
+    const focusedMonthly=useBundle?100:individualMonthly;
+    const focusedFirst=focusedSetup+focusedMonthly*12;
+    const tableY=143;
+    const headers=[['PACKAGE',LEFT+6],['SETUP',LEFT+260],['MONTHLY',LEFT+330],['FIRST YEAR',LEFT+415]];
+    rect(p4,LEFT,tableY,CONTENT,30,ink,ink);
+    headers.forEach(([t,x])=>p4.drawText(t,{x,y:H-tableY-19,size:7,font:bold,color:white}));
+    const priceRows=[
+      ['Focused proposal ('+count+' functions)','$'+individualSetup.toLocaleString(),'$'+individualMonthly.toLocaleString(),'$'+(individualSetup+individualMonthly*12).toLocaleString()],
+      ['Complete platform (8 functions)','$1,000','$100','$2,200']
+    ];
+    priceRows.forEach((row,i)=>{
+      const top=tableY+30+i*38; rect(p4,LEFT,top,CONTENT,38,i%2?white:pale,line);
+      p4.drawText(row[0],{x:LEFT+6,y:H-top-23,size:7,font:bold,color:ink});
+      row.slice(1).forEach((v,j)=>p4.drawText(v,{x:[LEFT+260,LEFT+330,LEFT+415][j],y:H-top-23,size:7,font:regular,color:ink}));
+    });
+    heading(p4,'Assessment recommendation',260);
+    addField(p4,'pricing_recommendation',count
+      ? (useBundle?'Based on the number of functions recommended, the complete platform bundle is the stronger overall value.':'Start with the focused proposal. The complete platform remains available if you expect to use the additional functions.')
+      : 'We are not recommending a paid package yet. Clarify the first workflow before making an investment.',LEFT,293,CONTENT,62,{fontSize:9,maxLength:300});
+    heading(p4,'Pricing terms',380);
+    addField(p4,'pricing_terms','Each individual function is $200 one-time setup plus $20 per month. The complete eight-function bundle is $1,000 setup plus $100 per month. The monthly fee covers maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Implementation scope and integrations are confirmed before work begins.',LEFT,413,CONTENT,108,{fontSize:8,maxLength:900});
+    heading(p4,'Important assessment notes',546);
+    addField(p4,'disclaimer',report.disclaimer||'This assessment is an initial opportunity review and does not guarantee savings or financial results.',LEFT,579,CONTENT,100,{fontSize:8,maxLength:800});
+    addField(p4,'editable_client_notes','Add your own notes here…',LEFT,704,CONTENT,64,{fontSize:8,maxLength:400});
+    addLabel(p4,'Additional notes (editable)',LEFT,692);
+  } else {
+    const p2=addPage('Your priorities',2);
+    heading(p2,'What you told us',100);
+    addField(p2,'business_idea',answers.idea||'Not provided',LEFT,133,CONTENT,95,{fontSize:10,maxLength:700});
+    heading(p2,'Resources already available',253);
+    addField(p2,'available_resources',(answers.resources||[]).join(' • ')||'No resources selected yet.',LEFT,286,CONTENT,75,{fontSize:9,maxLength:500});
+    heading(p2,'Areas where you want support',386);
+    addField(p2,'support_areas',(answers.support||[]).join(' • ')||'No support areas selected yet.',LEFT,419,CONTENT,90,{fontSize:9,maxLength:600});
+    heading(p2,'Your current position',534);
+    addField(p2,'founder_context',['Stage: '+(answers.stage||'Not specified'),'Target customer: '+(answers.customer||'Not specified'),'Revenue model: '+(answers.model||'Not specified'),'Industry: '+industry].join('\n'),LEFT,567,CONTENT,105,{fontSize:9,maxLength:500});
+
+    const p3=addPage('Recommended priorities & roadmap',3);
+    heading(p3,'Recommended priorities',100);
+    const priorities=(report.priorities||[]);
+    const priorityText=priorities.map((item,i)=>(i+1)+'. '+item.title+': '+item.body).join('\n\n');
+    addField(p3,'founder_priorities',priorityText||'Your answers did not identify specific priorities yet.',LEFT,133,CONTENT,240,{fontSize:9,maxLength:1700});
+    heading(p3,'Practical next steps',405);
+    addField(p3,'founder_roadmap',(report.steps||[]).map((step,i)=>(i+1)+'. '+step).join('\n\n'),LEFT,438,CONTENT,210,{fontSize:9,maxLength:1300});
+    heading(p3,'Planning notes',681);
+    addField(p3,'founder_notes','Use this space to record assumptions, questions and decisions as you validate the business idea.',LEFT,714,CONTENT,54,{fontSize:8,maxLength:350});
+
+    const p4=addPage('Important information',4);
+    heading(p4,'Assessment approach',100);
+    addField(p4,'founder_methodology',methodology,LEFT,133,CONTENT,120,{fontSize:9,maxLength:800});
+    heading(p4,'Important assessment notes',282);
+    addField(p4,'founder_disclaimer',report.disclaimer||'This is an initial planning report, not professional advice.',LEFT,315,CONTENT,120,{fontSize:9,maxLength:800});
+    heading(p4,'Your editable notes',466);
+    addField(p4,'founder_editable_notes','Add your own notes, questions and decisions here…',LEFT,499,CONTENT,180,{fontSize:9,maxLength:1200});
+  }
+  form.updateFieldAppearances(regular);
+  const bytes=await pdf.save();
+  const blob=new Blob([bytes],{type:'application/pdf'});
+  const url=URL.createObjectURL(blob);
+  const link=document.createElement('a');
+  link.href=url; link.download=pdfFilename(report);
+  document.body.appendChild(link); link.click(); link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 function bindDownloadReport() {
-  document.getElementById('downloadReportPdf')?.addEventListener('click',()=>window.print());
+  const buttons=[document.getElementById('downloadReportPdf'),document.getElementById('assessmentPrint')].filter(Boolean);
+  buttons.forEach(button=>button.addEventListener('click',async()=>{
+    const report=activeAssessment===assessments.business?buildBusinessReport():buildFounderReport();
+    const isBusiness=activeAssessment===assessments.business;
+    const original=button.innerHTML;
+    button.disabled=true; button.textContent='Preparing your PDF…';
+    try { await createEditableAssessmentPdf(report,isBusiness); button.textContent='PDF downloaded'; }
+    catch(error) { console.error(error); button.textContent='Download failed'; window.alert(error.message||'The PDF could not be created. Please try again.'); }
+    finally { setTimeout(()=>{button.disabled=false;button.innerHTML=original;},1800); }
+  }));
 }
-
 function renderReport() {
   const isBusiness = activeAssessment === assessments.business;
   const report = isBusiness ? buildBusinessReport() : buildFounderReport();
@@ -157,9 +393,9 @@ function renderReport() {
   modalContent.innerHTML = intro+businessSections+
     '<section class="report-section report-notes"><h3>Important assessment notes</h3><p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p></section>'+
     renderDownloadReportSection()+
-    '<div class="assessment-actions report-actions"><button class="assessment-back" type="button" id="assessmentRestart">Start again</button><button class="button button-primary" type="button" id="assessmentPrint">Print / Save report <span>↗</span></button></div>';
+    '<div class="assessment-actions report-actions"><button class="assessment-back" type="button" id="assessmentRestart">Start again</button><button class="button button-primary" type="button" id="assessmentPrint">Download editable PDF <span>↓</span></button></div>';
   document.getElementById('assessmentRestart').addEventListener('click',()=>{currentStep=0;answers={};renderQuestion();});
-  document.getElementById('assessmentPrint').addEventListener('click',()=>window.print());
+  
   bindDownloadReport();
 }
 function renderFounderSections(report) {
