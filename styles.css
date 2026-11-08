@@ -1195,3 +1195,24 @@ body.cart-open{overflow:hidden}
   .report-methodology,.report-function-comparison{break-inside:avoid!important;page-break-inside:avoid!important}
   .function-compare-status,.function-compare-head{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* Final PDF typography and pagination safeguards */
+.report-download-kicker{display:flex;align-items:center;flex-wrap:wrap;gap:0 9px;margin:0 0 8px;color:#287f79;font:800 10px/1.8 'DM Sans',sans-serif;letter-spacing:1.7px;word-spacing:3px}
+.report-download-kicker>span{display:inline-block;white-space:nowrap}
+.report-download-kicker .report-kicker-separator{color:#91aaa9;font-size:12px;letter-spacing:0;margin:0 1px}
+@media print{
+ @page{size:A4 portrait;margin:14mm 14mm 15mm}
+ *,*::before,*::after{box-sizing:border-box!important}
+ html,body,#assessmentModal,.assessment-dialog,.assessment-content{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important}
+ .report-download-kicker{display:flex!important;flex-direction:row!important;flex-wrap:nowrap!important;align-items:center!important;gap:0 8px!important;font-size:9px!important;line-height:1.8!important;letter-spacing:1.5px!important;word-spacing:3px!important;white-space:nowrap!important}
+ .report-download-kicker>span{white-space:nowrap!important}
+ .report-document-brand,.report-topline,.assessment-content>h2,.assessment-intro{break-inside:avoid!important;page-break-inside:avoid!important}
+ .report-section>h3{break-after:avoid-page!important;page-break-after:avoid!important}
+ .report-recommendations article,.growth-card,.package-card,.report-pricing-table-wrap,.report-cost-chart,.report-pricing-savings,.function-compare-table,.function-compare-legend,.report-disclaimer{break-inside:avoid!important;page-break-inside:avoid!important}
+ .report-section{overflow:visible!important;break-inside:auto!important;page-break-inside:auto!important;margin-top:8mm!important;margin-bottom:4mm!important}
+ .report-final{break-before:page!important;page-break-before:always!important}
+ .report-pricing-table{width:100%!important;table-layout:fixed!important;border-collapse:collapse!important}
+ .report-pricing-table th,.report-pricing-table td{overflow-wrap:anywhere!important;word-break:normal!important}
+ p,li{orphans:3;widows:3}
+ .report-methodology,.report-function-comparison{break-inside:auto!important;page-break-inside:auto!important}
+}
