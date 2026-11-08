@@ -140,7 +140,7 @@ function renderQuestion() {
 function renderReport() {
   const isBusiness = activeAssessment === assessments.business;
   const report = isBusiness ? buildBusinessReport() : buildFounderReport();
-  modalContent.innerHTML = '<div class="report-topline"><span class="assessment-kicker">YOUR DONNINGER.AI REPORT</span><span class="report-date">'+new Date().toLocaleDateString()+'</span></div>'+
+  modalContent.innerHTML = '<div class="report-topline"><span class="assessment-kicker">YOUR DONNINGER.AI REPORT'+(isBusiness && report.clientName ? ' · PREPARED FOR '+escapeHtml(report.clientName) : '')+'</span><span class="report-date">'+new Date().toLocaleDateString()+'</span></div>'+
     '<h2 id="assessmentTitle">'+escapeHtml(report.title)+'</h2>'+
     '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>'+
     '<div class="report-highlight"><span>'+escapeHtml(report.highlightLabel)+'</span><strong>'+escapeHtml(report.highlight)+'</strong><small>'+escapeHtml(report.highlightNote)+'</small></div>'+
@@ -233,8 +233,9 @@ function buildBusinessReport() {
   };
   const company = answers.company ? answers.company+' — ' : '';
   return {
+    clientName:answers.company ? answers.company.trim() : '',
     title:company+'Automation opportunity overview',
-    summary:'Based on your answers, '+(answers.industry||'your business')+' has a starting point for improving '+(answers.goal||'day-to-day operations').toLowerCase()+'.',
+    summary:(answers.company ? 'Prepared for '+answers.company.trim()+'. ' : '')+'Based on your answers, '+(answers.industry||'your business')+' has a starting point for improving '+(answers.goal||'day-to-day operations').toLowerCase()+'.',
     highlightLabel:'YOUR FIRST AUTOMATION PRIORITY',
     highlight:recommendations[0]?.title || 'Map your highest-friction workflow',
     highlightNote:'A tailored implementation begins with your real process, current software and team requirements. We confirm feasibility, integration access, approval controls and scope before quoting.',
