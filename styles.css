@@ -1046,3 +1046,152 @@ body.cart-open{overflow:hidden}
  .report-download-section{align-items:flex-start;flex-direction:column}
  .report-download-section .button{width:100%}
 }
+
+
+/* Assessment report refinement: clearer hierarchy, methodology and function comparison */
+.report-download-section .assessment-kicker{
+  display:block;
+  max-width:100%;
+  font-family:'DM Sans',sans-serif;
+  font-size:10px;
+  font-weight:800;
+  line-height:1.9;
+  letter-spacing:2.1px;
+  word-spacing:4px;
+  white-space:normal;
+  overflow-wrap:normal;
+  color:#287f79;
+  margin-bottom:7px;
+}
+.report-download-section h3{
+  font:800 21px/1.35 'Manrope',sans-serif;
+  letter-spacing:-.35px;
+  word-spacing:1px;
+  color:#203951;
+  margin:4px 0 8px;
+}
+.report-download-section p{
+  font:400 12px/1.7 'DM Sans',sans-serif;
+  letter-spacing:0;
+  word-spacing:1px;
+  color:#718296;
+  margin:0;
+}
+.report-methodology p{
+  font:400 11px/1.85 'DM Sans',sans-serif;
+  color:#52677c;
+  margin:12px 0;
+  letter-spacing:0;
+  word-spacing:.5px;
+}
+.report-methodology .report-method-note{
+  margin-top:16px;
+  padding:12px 14px;
+  border-left:3px solid #70aaa3;
+  background:#f1f7f7;
+  border-radius:0 7px 7px 0;
+  color:#647c82;
+  font-size:9px;
+  line-height:1.7;
+}
+.report-function-comparison{padding-bottom:20px}
+.function-compare-legend{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px 18px;
+  margin:12px 0 14px;
+}
+.function-compare-legend span{
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+  color:#627589;
+  font:600 9px/1.5 'DM Sans',sans-serif;
+}
+.function-compare-legend i{
+  display:inline-block;
+  width:9px;height:9px;border-radius:3px;
+}
+.legend-current{background:#5c8dbd}
+.legend-wanted{background:#d6a14f}
+.legend-recommended{background:#239889}
+.function-compare-table{
+  border:1px solid #e2e9ee;
+  border-radius:9px;
+  overflow:hidden;
+}
+.function-compare-head,.function-compare-row{
+  display:grid;
+  grid-template-columns:minmax(190px,1.7fr) repeat(3,minmax(78px,.75fr));
+  align-items:center;
+  gap:8px;
+}
+.function-compare-head{
+  padding:10px 12px;
+  background:#203951;
+  color:#fff;
+  font:700 8px/1.4 'DM Sans',sans-serif;
+  letter-spacing:.35px;
+  text-transform:uppercase;
+}
+.function-compare-row{
+  min-height:38px;
+  padding:7px 12px;
+  border-top:1px solid #edf1f4;
+  background:#fff;
+}
+.function-compare-row:nth-child(odd){background:#f8fafb}
+.function-compare-row>strong{
+  font:700 9px/1.4 'DM Sans',sans-serif;
+  color:#344c63;
+}
+.function-compare-status{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  justify-self:start;
+  min-width:62px;
+  padding:5px 7px;
+  border-radius:5px;
+  color:#9aa6b1;
+  font:700 8px/1.2 'DM Sans',sans-serif;
+  background:#f0f3f5;
+}
+.function-compare-status.is-active{background:#eaf2fa;color:#3f75a8}
+.function-compare-status.is-wanted{background:#fbf3e7;color:#9a6a25}
+.function-compare-status.is-recommended{background:#e8f6f2;color:#167d71}
+@media(max-width:600px){
+  .function-compare-head,.function-compare-row{
+    grid-template-columns:minmax(115px,1.45fr) repeat(3,minmax(55px,.7fr));
+    gap:4px;
+    padding-left:7px;padding-right:7px;
+  }
+  .function-compare-head{font-size:7px}
+  .function-compare-row>strong{font-size:8px}
+  .function-compare-status{min-width:0;padding:4px 5px;font-size:7px}
+  .function-compare-legend{gap:7px 10px}
+  .function-compare-legend span{font-size:8px}
+}
+@media print{
+  .report-download-section .assessment-kicker{
+    font-size:9px!important;
+    line-height:1.9!important;
+    letter-spacing:2px!important;
+    word-spacing:4px!important;
+  }
+  .report-methodology p{font-size:9px!important;line-height:1.65!important;margin:8px 0!important}
+  .report-methodology .report-method-note{font-size:8px!important}
+  .function-compare-head,.function-compare-row{
+    grid-template-columns:minmax(175px,1.7fr) repeat(3,minmax(68px,.75fr));
+    gap:6px;
+  }
+  .function-compare-head{padding:8px 9px;font-size:7px}
+  .function-compare-row{min-height:31px;padding:5px 9px}
+  .function-compare-row>strong{font-size:8px}
+  .function-compare-status{font-size:7px;padding:4px 5px}
+  .function-compare-table,.function-compare-legend{break-inside:avoid;page-break-inside:avoid}
+  .report-final{break-before:page!important;page-break-before:always!important}
+  .report-final+.report-notes{break-before:avoid!important;page-break-before:avoid!important}
+  .report-methodology,.report-function-comparison{break-inside:avoid!important;page-break-inside:avoid!important}
+  .function-compare-status,.function-compare-head{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
