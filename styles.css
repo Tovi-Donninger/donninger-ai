@@ -605,3 +605,17 @@ body.assessment-open{overflow:hidden}
  .function-page .nav a{padding:13px 4px;border-bottom:1px solid #edf1ec}
  .function-page .nav .nav-cta{text-align:center;margin-top:10px;border:0;padding:13px}
 }
+
+/* Expanded automation product pages */
+.function-input-grid{margin-bottom:30px}.function-activity-section,.function-human-section{margin:48px 0}
+.function-section-heading{display:grid;grid-template-columns:1fr 1fr;gap:35px;align-items:end;margin-bottom:20px}
+.function-section-heading h2{margin:0;color:#1b2c45;font:800 clamp(25px,3vw,34px)/1.2 'Manrope';letter-spacing:-1px}
+.function-section-heading>p{margin:0;color:#718096;font-size:12px;line-height:1.8}
+.function-activity-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.function-activity-card{height:100%}
+.function-status{display:inline-flex;padding:6px 9px;border-radius:5px;font-size:8px;font-weight:800;letter-spacing:.8px;margin-bottom:13px}
+.status-auto{background:#e4f6f1;color:#087f68}.status-assisted{background:#eaf1fc;color:#315e9c}
+.function-record-grid{margin-top:30px}.function-human-section{padding:27px;border:1px solid #e1e9ef;border-radius:13px;background:#f8fafc}
+.function-human-list{display:grid;grid-template-columns:1fr 1fr;gap:10px 25px;padding:0;margin:0;list-style:none}
+.function-human-list li{position:relative;padding:12px 13px 12px 34px;border:1px solid #e6edf4;border-radius:9px;background:#fff;color:#5f7085;font-size:11px;line-height:1.7}
+.function-human-list li:before{content:"";position:absolute;left:13px;top:17px;width:9px;height:9px;border-radius:50%;background:#e6a34c;box-shadow:0 0 0 3px #fbf1df}
+@media(max-width:760px){.function-section-heading{grid-template-columns:1fr;gap:12px}.function-activity-grid,.function-human-list{grid-template-columns:1fr}.function-activity-section,.function-human-section{margin:35px 0}}
