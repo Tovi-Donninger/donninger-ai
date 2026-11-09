@@ -32,3 +32,33 @@
 .qualification-loading-stage{margin-top:16px;font-size:12px;font-weight:700;color:#244d76}
 .qualification-loading-time{margin-top:7px;font-size:12px;font-variant-numeric:tabular-nums;color:#1688d4}
 .qualification-loading-note{margin:18px 0 0;font-size:10px;line-height:1.5;color:#8795a7}
+
+/* CareerFinder-inspired qualification experience with real streamed progress */
+.qualification-loading-panel{width:min(560px,100%);padding:30px 34px 26px;text-align:left}
+.qualification-loading-orbit{position:relative;display:grid;place-items:center;width:76px;height:76px;margin:0 auto 18px;border:1px solid #d8e6f3;border-radius:50%;animation:qualificationOrbit 8s linear infinite}
+.qualification-loading-orbit:before,.qualification-loading-orbit:after{content:"";position:absolute;inset:7px;border:1px solid #e3edf6;border-radius:50%}
+.qualification-loading-orbit:after{inset:-6px;border-color:#eaf1f8}
+.qualification-orbit-core{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:#173b61;color:#fff;font:800 21px var(--font);box-shadow:0 7px 20px #173b6125}
+.qualification-orbit-dot{position:absolute;top:3px;right:8px;width:10px;height:10px;border-radius:50%;background:#36b7df;box-shadow:0 0 0 5px #36b7df25}
+@keyframes qualificationOrbit{to{transform:rotate(360deg)}}
+.qualification-loading-panel .qualification-loading-eyebrow{text-align:center}
+.qualification-loading-panel h2{text-align:center;font-size:24px;letter-spacing:-.6px}
+.qualification-loading-panel .qualification-loading-copy{text-align:center;max-width:420px;min-height:38px}
+.qualification-progress-track{height:8px}
+.qualification-progress-bar{width:0;height:100%;background:linear-gradient(90deg,#1688d4,#43c5e8);transition:width .45s ease}
+.qualification-progress-meta{display:flex;justify-content:space-between;gap:12px;margin-top:8px;font-size:10px;color:#61748c}
+.qualification-progress-meta strong{color:#244d76;font-weight:700}
+.qualification-progress-meta span{font-variant-numeric:tabular-nums;font-weight:800;color:#1688d4}
+.qualification-loading-steps{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:20px}
+.qualification-loading-steps span{font-size:9px;font-weight:700;color:#9aa9b9;transition:color .2s ease}
+.qualification-loading-steps span i{font-style:normal;font-size:9px;margin-right:4px;color:#a9b7c5}
+.qualification-loading-steps span.active,.qualification-loading-steps span.done{color:#246b9e}
+.qualification-loading-steps span.done i{color:#24a6a9}
+.qualification-loading-stage{text-align:center;min-height:18px}
+.qualification-insight{margin-top:20px;padding:13px 15px;border:1px solid #e3edf5;border-radius:10px;background:#f5f9fd}
+.qualification-insight span{font-size:8px;font-weight:800;letter-spacing:1.1px;color:#1688d4}
+.qualification-insight p{margin:5px 0 0;font-size:10px;line-height:1.55;color:#526b83}
+.qualification-loading-note{text-align:center;margin-top:14px}
+.qualification-loading-finished .qualification-loading-panel{animation:qualificationFinish .25s ease-out}
+@keyframes qualificationFinish{from{transform:translateY(5px);opacity:.7}to{transform:translateY(0);opacity:1}}
+@media(max-width:600px){.qualification-loading-panel{padding:24px 18px 20px}.qualification-loading-steps{justify-content:flex-start;gap:10px 16px}.qualification-loading-panel h2{font-size:21px}}
