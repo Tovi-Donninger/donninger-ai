@@ -144,10 +144,53 @@ async function handleSalesLeads(request, env) {
   }
   return json({ error: "Method not allowed." }, 405, { allow: "GET, POST" });
 }
+async function handleSalesLeadImport(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+  const length = Number(request.headers.get("content-length") || 0);
+  if (length > 500000) return json({ error: "The CSV import is too large. Please split it into smaller files." }, 413);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid import request." }, 400); }
+  if (!Array.isArray(body.leads) || body.leads.length < 1 || body.leads.length > 100) return json({ error: "Import between 1 and 100 lead rows at a time." }, 400);
+  const organisationId = "dev-donninger";
+  const allowedPermissions = ["unknown", "consent_given", "existing_customer_basis", "legitimate_interest_reviewed", "do_not_contact"];
+  let imported = 0;
+  const errors = [];
+  for (let index = 0; index < body.leads.length; index++) {
+    const row = body.leads[index] || {};
+    const firstName = String(row.first_name || "").trim().slice(0, 100);
+    const lastName = String(row.last_name || "").trim().slice(0, 100);
+    const email = String(row.email || "").trim().slice(0, 254);
+    const phone = String(row.phone || "").trim().slice(0, 40);
+    const company = String(row.company || "").trim().slice(0, 160);
+    const jobTitle = String(row.job_title || "").trim().slice(0, 120);
+    const customerNeed = String(row.customer_need || "").trim().slice(0, 2000);
+    const source = String(row.source || "csv_import").trim().slice(0, 80);
+    const permission = allowedPermissions.includes(row.contact_permission) ? row.contact_permission : "unknown";
+    if (!firstName) { errors.push("Row " + (index + 2) + ": first name is required."); continue; }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errors.push("Row " + (index + 2) + ": invalid email address."); continue; }
+    try {
+      const id = crypto.randomUUID();
+      await env.DB.prepare(
+        "INSERT INTO leads (id, organisation_id, first_name, last_name, email, phone, company, job_title, source, customer_need, contact_permission) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+      ).bind(id, organisationId, firstName, lastName, email, phone, company, jobTitle, source, customerNeed, permission).run();
+      await env.DB.prepare(
+        "INSERT INTO sales_activity (id, organisation_id, lead_id, activity_type, details_json, actor) VALUES (?, ?, ?, 'lead_imported', ?, ?)"
+      ).bind(crypto.randomUUID(), organisationId, id, JSON.stringify({ source, import_row: index + 2 }), auth.session.email).run();
+      imported++;
+    } catch (error) {
+      console.error("Lead import row failed:", index + 2, error);
+      errors.push("Row " + (index + 2) + ": database insert failed.");
+    }
+  }
+  return json({ success: errors.length === 0, imported, failed: body.leads.length - imported, errors });
+}
 async function handleApi(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/api/reports/send") return handleReportSend(request, env);
   if (url.pathname === "/api/sales/leads") return handleSalesLeads(request, env);
+  if (url.pathname === "/api/sales/leads/import") return handleSalesLeadImport(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     if (!env.DEV_ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Development authentication is not configured. Add the required Worker secrets in Cloudflare." }, 503);
     if (!env.DEV_ADMIN_ENABLED || env.DEV_ADMIN_ENABLED !== "true") return json({ error: "Development administrator access is disabled." }, 403);
