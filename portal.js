@@ -78,7 +78,7 @@ async function loadSalesPipeline(){
  const count=document.getElementById('salesPipelineCount'),host=document.getElementById('salesPipelineBoard');if(!host)return;count.textContent='Loading sales pipeline…';
  try{const r=await fetch('/api/sales/pipeline',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load sales pipeline.');const rows=d.pipeline_leads||[];count.textContent=rows.length+' leads currently in active sales stages';
  const stages=[['contacted','Contacted Leads'],['meeting_requested','Meeting Requested'],['meeting_confirmed','Meeting Confirmed'],['meeting_completed','Meeting Completed'],['converted','Converted'],['lost','Lost']];
- const options=stages.map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('');
+ const options=stages.filter(([value])=>value!==stage).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('');
  host.innerHTML=stages.map(([stage,label])=>{const items=rows.filter(v=>v.pipeline_stage===stage);return '<section class="sales-pipeline-column"><header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+(items.length?items.map(v=>'<article class="sales-pipeline-lead"><strong>'+escapeHtml((v.first_name+' '+(v.last_name||'')).trim())+'</strong><small>'+escapeHtml(v.company||'')+' · '+escapeHtml(v.email||'')+'</small><p>'+escapeHtml(v.customer_need||'No customer need recorded')+'</p><label>Update stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(v.lead_id)+'"><option value="'+stage+'" selected>'+label+'</option>'+options+'</select></label></article>').join(''):'<div class="sales-empty-state">No leads in this stage.</div>')+'</section>';}).join('');
  }catch(e){count.textContent='Unable to load pipeline';host.textContent=e.message;}
 }
@@ -96,7 +96,7 @@ async function loadQualificationProfile(){
 document.getElementById("functionDetailContent").addEventListener("change",async e=>{
  const select=e.target.closest(".pipeline-stage-select");if(!select)return;const leadId=select.dataset.leadId,stage=select.value;select.disabled=true;
  try{const r=await fetch("/api/sales/pipeline",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_id:leadId,stage})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not update pipeline stage.");await loadSalesPipeline();await loadQualifiedLeads();await loadUnqualifiedLeads();}
- catch(err){select.value=select.querySelector("option[selected]")?.value||"contacted";alert(err.message);}
+ catch(err){count.textContent="Pipeline update failed: "+err.message;await loadSalesPipeline();}
  finally{select.disabled=false;}
 });
 document.getElementById("functionDetailContent").addEventListener("submit",async e=>{
