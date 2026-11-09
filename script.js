@@ -688,9 +688,27 @@ function renderBusinessPricing(report) {
 }
 function renderFinalRecommendations(report,isBusiness) {
   if (isBusiness) return renderBusinessComparison(report)+renderBusinessPricing(report);
-  const packages=packageRecommendations(false);
-  const packageBlock='<section class="report-section report-final"><h3>Recommended Donninger.AI package</h3><p class="report-chart-intro">These recommendations are matched to the needs identified in your answers. We will confirm the exact scope before any implementation.</p><div class="package-recommendations">'+packages.map((item,i)=>'<article class="package-card '+(item.bundle?'package-card-bundle':'')+'"><span>'+(item.bundle?'BEST VALUE - ALL EIGHT FUNCTIONS':'RECOMMENDED '+(i+1))+'</span><strong>'+escapeHtml(item.name)+'</strong><p>'+escapeHtml(item.why)+'</p><small>'+escapeHtml(item.price)+'</small>'+(item.bundle?'<button type="button" class="button button-primary cart-add-button" data-cart-add-all>Add the complete bundle to cart</button>':(i===0?'<button type="button" class="button button-primary cart-add-button" data-cart-add-package="founder-foundations">Add this package to cart</button>':'<button type="button" class="button button-primary cart-add-button" data-cart-add-package="founder-toolkit">Add this package to cart</button>'))+'</article>').join('')+'</div></section>';
-  return packageBlock;
+  const functions = [
+    ['sales','Sales & Lead Generation','Capture enquiries, organise leads and manage follow-ups.'],
+    ['marketing','Marketing','Plan campaigns, prepare content and track marketing activity.'],
+    ['customer-service','Customer Service','Organise support requests, responses and customer follow-ups.'],
+    ['hr-recruitment','HR & Recruitment','Support vacancy workflows, applications and onboarding.'],
+    ['finance','Finance & Accounting','Organise invoices, receipts, reminders and approval workflows.'],
+    ['operations','Operations & Administration','Coordinate recurring tasks, documents and internal workflows.'],
+    ['stock-logistics','Stock, Suppliers & Logistics','Track stock alerts, supplier follow-ups and order workflows.'],
+    ['management','Management & Reporting','Bring key performance measures and management reports together.']
+  ];
+  const rows = functions.map(([id,name,description]) =>
+    '<tr><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(description)+'</small></td><td>$200</td><td>$20</td><td><button type="button" class="button cart-add-button" data-cart-add="'+id+'">Add to cart</button></td></tr>'
+  ).join('');
+  return '<section class="report-section report-final"><h3>Choose your Donninger.AI package</h3>'+
+    '<p class="report-chart-intro">Choose the business functions your new or growing business needs. Every function has the same transparent pricing as the Business Automation Assessment.</p>'+
+    '<div class="report-pricing-table-wrap"><table class="report-pricing-table"><thead><tr><th>Business function</th><th>Setup</th><th>Monthly</th><th>Choose</th></tr></thead><tbody>'+rows+
+    '<tr><td><strong>Complete Donninger.AI Platform</strong><small>All eight functions · save $600 upfront and $60/month compared with buying separately</small></td><td>$1,000</td><td>$100</td><td><button type="button" class="button button-primary cart-add-button" data-cart-add-all>Add bundle</button></td></tr>'+
+    '</tbody></table></div>'+
+    '<div class="report-pricing-savings"><strong>Complete platform bundle</strong><span>All eight functions for $1,000 setup + $100/month. Buying all eight separately would cost $1,600 setup + $160/month.</span></div>'+
+    '<p class="report-field-note">The monthly fee includes maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Scope and integrations are confirmed before implementation.</p>'+
+    '</section>';
 }
 function buildBusinessReport() {
   const operating=answers.functions||[];
