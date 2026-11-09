@@ -547,7 +547,7 @@ async function handleSalesReplyIngest(request, env) {
   const subject = String(body.subject || "").trim().slice(0, 300);
   const messageText = String(body.body || "").trim().slice(0, 12000);
   const receivedAt = String(body.received_at || "").trim().slice(0, 40);
-  if (!messageId || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(sender) || !messageText) {
+  if (!messageId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender) || !messageText) {
     return json({ error: "The reply is missing a valid message ID, sender or message body." }, 400);
   }
   const org = "dev-donninger";
