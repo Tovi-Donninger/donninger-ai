@@ -520,7 +520,7 @@ async function handleClientMeetingResponse(request,env) {
     if(!/^[A-Za-z0-9_-]{40,60}$/.test(token)||!["accept","decline"].includes(decision))return new Response("Invalid response.",{status:400});
     const hash=await meetingTokenHash(token);
     const purpose=decision==="accept"?"client_accept":"client_decline";
-    const record=await env.DB.prepare("SELECT t.id AS token_id,t.appointment_id,a.lead_id,a.status,a.admin_accepted_at FROM sales_appointment_tokens t JOIN sales_appointments a ON a.id=t.appointment_id WHERE t.token_hash=? AND t.organisation_id=? AND t.purpose=? AND t.used_at IS NULL AND t.expires_at>?").bind(hash,"dev-donninger",purpose,new Date().toISOString()).first();
+    const record=await env.DB.prepare("SELECT t.id AS token_id,t.appointment_id,a.lead_id,a.status,a.admin_accepted_at,l.first_name,l.email FROM sales_appointment_tokens t JOIN sales_appointments a ON a.id=t.appointment_id JOIN leads l ON l.id=a.lead_id WHERE t.token_hash=? AND t.organisation_id=? AND t.purpose=? AND t.used_at IS NULL AND t.expires_at>?").bind(hash,"dev-donninger",purpose,new Date().toISOString()).first();
     if(!record||record.status!=="requested")return new Response("This meeting response link has expired or has already been used.",{status:410});
     const now=new Date().toISOString();
     if(decision==="accept"&&!record.admin_accepted_at)return new Response("The administrator has not approved this meeting time yet.",{status:409});
