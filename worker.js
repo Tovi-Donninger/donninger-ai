@@ -350,7 +350,7 @@ async function handleBulkLeadQualification(request,env){
      }
      if(statements.length)await env.DB.batch(statements);
      processed=Math.min(offset+batch.length,leads.length);
-     emit({type:"progress",stage:"assessing",processed,total:leads.length,checked:qualified.length+notQualified.length,qualified_count:qualified.length,not_qualified_count:notQualified.length,failed_count:errors.length,batch:Math.floor(offset/batchSize)+1,total_batches,model});
+     emit({type:"progress",stage:"assessing",processed,total:leads.length,checked:qualified.length+notQualified.length,qualified_count:qualified.length,not_qualified_count:notQualified.length,failed_count:errors.length,batch:Math.floor(offset/batchSize)+1,total_batches:totalBatches,model});
     }
     emit({type:"complete",result:{success:errors.length===0,profile_version:version,model,source_lead_count:leads.length,criteria,checked:qualified.length+notQualified.length,qualified_count:qualified.length,not_qualified_count:notQualified.length,failed_count:errors.length,qualified,not_qualified:notQualified,errors}});
    }catch(error){
