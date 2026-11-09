@@ -169,9 +169,9 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    const response=await fetch("/api/sales/appointments/respond",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({appointment_id:appointmentId,decision})});
    const result=await response.json();
    if(!response.ok)throw new Error(result.error||"Could not process the meeting decision.");
+   await loadSalesAppointments();await loadSalesPipeline();
    if(result.email_sent===false)throw new Error(result.error||"Approval saved, but the client email was not sent.");
    if(count)count.textContent=result.message||"Meeting decision saved.";
-   await loadSalesAppointments();await loadSalesPipeline();
   }catch(error){
    if(count)count.textContent="Meeting action: "+error.message;
    buttons?.forEach(button=>button.disabled=false);
