@@ -375,12 +375,12 @@ async function handleBulkLeadQualification(request,env){
       if(result.qualified){
        statements.push(env.DB.prepare("INSERT INTO qualified_leads (id,organisation_id,lead_id,qualification_run_id,fit_score,priority,qualification_summary,qualification_json) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(organisation_id,lead_id) DO UPDATE SET qualification_run_id=excluded.qualification_run_id,fit_score=excluded.fit_score,priority=excluded.priority,qualification_summary=excluded.qualification_summary,qualification_json=excluded.qualification_json,qualified_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(crypto.randomUUID(),org,lead.id,runId,result.fit_score,result.priority,result.summary||"",JSON.stringify(result)));
        statements.push(env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
-       statements.push(env.DB.prepare("UPDATE leads SET status='qualified',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
+       statements.push(env.DB.prepare("UPDATE leads SET status='qualified',pipeline_stage='qualified',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
        qualified.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,priority:result.priority,summary:result.summary||"",result});
       }else{
        statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
        statements.push(env.DB.prepare("INSERT INTO unqualified_leads (id,organisation_id,lead_id,qualification_run_id,fit_score,qualification_summary,qualification_json) VALUES (?,?,?,?,?,?,?) ON CONFLICT(organisation_id,lead_id) DO UPDATE SET qualification_run_id=excluded.qualification_run_id,fit_score=excluded.fit_score,qualification_summary=excluded.qualification_summary,qualification_json=excluded.qualification_json,assessed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(crypto.randomUUID(),org,lead.id,runId,result.fit_score,result.summary||"",JSON.stringify(result)));
-       statements.push(env.DB.prepare("UPDATE leads SET status='lost',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
+       statements.push(env.DB.prepare("UPDATE leads SET status='lost',pipeline_stage='unqualified',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
        notQualified.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,summary:result.summary||"",gaps:result.gaps||[],matched_criteria:result.matched_criteria||[]});
       }
      }
@@ -400,14 +400,39 @@ async function handleBulkLeadQualification(request,env){
 async function handleQualifiedLeads(request,env){
  const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
  if(request.method!=="GET")return json({error:"Method not allowed."},405);
- const rows=await env.DB.prepare("SELECT q.lead_id,q.fit_score,q.priority,q.qualification_summary,q.qualification_json,q.qualified_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? ORDER BY q.fit_score DESC,q.qualified_at DESC LIMIT 200").bind("dev-donninger").all();
+ const rows=await env.DB.prepare("SELECT q.lead_id,q.fit_score,q.priority,q.qualification_summary,q.qualification_json,q.qualified_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.pipeline_stage='qualified' ORDER BY q.fit_score DESC,q.qualified_at DESC LIMIT 200").bind("dev-donninger").all();
  return json({qualified_leads:rows.results||[]});
 }
 async function handleUnqualifiedLeads(request,env){
  const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
  if(request.method!=="GET")return json({error:"Method not allowed."},405);
- const rows=await env.DB.prepare("SELECT u.lead_id,u.fit_score,u.qualification_summary,u.qualification_json,u.assessed_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM unqualified_leads u JOIN leads l ON l.id=u.lead_id WHERE u.organisation_id=? ORDER BY u.assessed_at DESC LIMIT 200").bind("dev-donninger").all();
+ const rows=await env.DB.prepare("SELECT u.lead_id,u.fit_score,u.qualification_summary,u.qualification_json,u.assessed_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM unqualified_leads u JOIN leads l ON l.id=u.lead_id WHERE u.organisation_id=? AND l.pipeline_stage='unqualified' ORDER BY u.assessed_at DESC LIMIT 200").bind("dev-donninger").all();
  return json({unqualified_leads:rows.results||[]});
+}
+async function handleSalesPipeline(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+  const org = 'dev-donninger';
+  if (request.method === 'GET') {
+    const rows = await env.DB.prepare("SELECT l.id AS lead_id,l.first_name,l.last_name,l.email,l.phone,l.company,l.job_title,l.customer_need,l.pipeline_stage,l.contact_permission,l.updated_at,q.fit_score,q.priority,q.qualification_summary FROM leads l LEFT JOIN qualified_leads q ON q.lead_id=l.id AND q.organisation_id=l.organisation_id WHERE l.organisation_id=? AND l.pipeline_stage IN ('contacted','meeting_requested','meeting_confirmed','meeting_completed','converted','lost') ORDER BY l.updated_at DESC LIMIT 300").bind(org).all();
+    return json({ pipeline_leads: rows.results || [] });
+  }
+  if (request.method === 'POST') {
+    let body; try { body = await request.json(); } catch { return json({ error: 'Invalid request.' }, 400); }
+    const leadId = String(body.lead_id || '').trim(), stage = String(body.stage || '').trim();
+    const allowed = ['contacted','meeting_requested','meeting_confirmed','meeting_completed','converted','lost'];
+    if (!leadId || !allowed.includes(stage)) return json({ error: 'Choose a valid lead and pipeline stage.' }, 400);
+    const lead = await env.DB.prepare('SELECT id,pipeline_stage FROM leads WHERE id=? AND organisation_id=?').bind(leadId, org).first();
+    if (!lead) return json({ error: 'Lead not found.' }, 404);
+    const legacyStatus = stage === 'converted' ? 'won' : stage === 'lost' ? 'lost' : stage === 'meeting_confirmed' || stage === 'meeting_completed' ? 'proposal' : 'contacted';
+    const details = JSON.stringify({ from: lead.pipeline_stage, to: stage, note: String(body.note || '').slice(0, 1000) });
+    await env.DB.batch([
+      env.DB.prepare("UPDATE leads SET pipeline_stage=?,status=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?").bind(stage, legacyStatus, leadId, org),
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'pipeline_stage_changed',?,?)").bind(crypto.randomUUID(), org, leadId, details, auth.session.email)
+    ]);
+    return json({ success: true, lead_id: leadId, pipeline_stage: stage });
+  }
+  return json({ error: 'Method not allowed.' }, 405, { allow: 'GET, POST' });
 }
 async function handleSalesContactTestLead(request, env) {
   const auth = await requireAdmin(request, env);
@@ -495,9 +520,10 @@ async function handleSalesContactTestLead(request, env) {
       console.error("Apps Script sales email response:", upstream.status, text.slice(0, 500));
       return json({ error: result?.message || "The email service did not confirm that the test email was sent." }, 502);
     }
-    await env.DB.prepare(
-      "INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_test_email_sent',?,?)"
-    ).bind(crypto.randomUUID(), "dev-donninger", lead.id, JSON.stringify({ recipient: email, subject, approved: true }), auth.session.email).run();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE leads SET pipeline_stage='contacted',status='contacted',last_contacted_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?").bind(lead.id, "dev-donninger"),
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_test_email_sent',?,?)").bind(crypto.randomUUID(), "dev-donninger", lead.id, JSON.stringify({ recipient: email, subject, approved: true, pipeline_stage: "contacted" }), auth.session.email)
+    ]);
     return json({ success: true, message: "Your approved Donninger.AI test sales email was sent to " + email + "." });
   } catch (error) {
     console.error("Sales test email send failed:", error);
@@ -517,6 +543,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/qualify-batch") return handleBulkLeadQualification(request, env);
   if (url.pathname === "/api/sales/qualified-leads") return handleQualifiedLeads(request, env);
   if (url.pathname === "/api/sales/unqualified-leads") return handleUnqualifiedLeads(request, env);
+  if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
   if (url.pathname === "/api/sales/contact-test-lead") return handleSalesContactTestLead(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     if (!env.DEV_ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Development authentication is not configured. Add the required Worker secrets in Cloudflare." }, 503);
