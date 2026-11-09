@@ -291,6 +291,7 @@ async function handleBulkLeadQualification(request,env){
  await env.DB.prepare("UPDATE sales_qualification_profiles SET is_active=0 WHERE organisation_id=?").bind(org).run();
  await env.DB.prepare("INSERT INTO sales_qualification_profiles (id,organisation_id,name,criteria_json,version,is_active,created_by) VALUES (?,?,?,?,?,1,?)").bind(profileId,org,"Customer-defined lead qualification",JSON.stringify(profileCriteria),version,auth.session.email).run();
  const qualified=[],notQualified=[],errors=[];
+ assessmentSchema.properties.lead_id={type:"STRING"};assessmentSchema.required.push("lead_id");
  const assessmentSchema={type:"OBJECT",properties:{fit_score:{type:"INTEGER"},priority:{type:"STRING",enum:["low","medium","high"]},confidence:{type:"NUMBER"},qualified:{type:"BOOLEAN"},summary:{type:"STRING"},matched_criteria:{type:"ARRAY",items:{type:"STRING"}},gaps:{type:"ARRAY",items:{type:"STRING"}},evidence:{type:"ARRAY",items:{type:"OBJECT",properties:{field:{type:"STRING"},observed:{type:"STRING"},relevance:{type:"STRING"}},required:["field","observed","relevance"]}},recommended_next_action:{type:"STRING"},purchase_intent:{type:"STRING",enum:["explicit","possible","not_stated"]}},required:["fit_score","priority","confidence","qualified","summary","matched_criteria","gaps","evidence","recommended_next_action","purchase_intent"]};
 
  for(let offset=0;offset<leads.length;offset+=8){
