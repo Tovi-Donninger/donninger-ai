@@ -688,26 +688,38 @@ function renderBusinessPricing(report) {
 }
 function renderFinalRecommendations(report,isBusiness) {
   if (isBusiness) return renderBusinessComparison(report)+renderBusinessPricing(report);
-  const functions = [
-    ['sales','Sales & Lead Generation','Capture enquiries, organise leads and manage follow-ups.'],
-    ['marketing','Marketing','Plan campaigns, prepare content and track marketing activity.'],
-    ['customer-service','Customer Service','Organise support requests, responses and customer follow-ups.'],
-    ['hr-recruitment','HR & Recruitment','Support vacancy workflows, applications and onboarding.'],
-    ['finance','Finance & Accounting','Organise invoices, receipts, reminders and approval workflows.'],
-    ['operations','Operations & Administration','Coordinate recurring tasks, documents and internal workflows.'],
-    ['stock-logistics','Stock, Suppliers & Logistics','Track stock alerts, supplier follow-ups and order workflows.'],
-    ['management','Management & Reporting','Bring key performance measures and management reports together.']
+  const catalog = [
+    ['sales','Sales & Lead Generation','Capture, qualify and follow up with leads.','Sales & lead generation'],
+    ['marketing','Marketing','Plan campaigns, publish content and track results.','Marketing'],
+    ['customer-service','Customer Service','Respond faster and manage customer requests.','Customer service'],
+    ['hr-recruitment','HR & Recruitment','Coordinate candidates and routine people processes.','Human resources & recruitment'],
+    ['finance','Finance & Accounting','Organise invoices, expenses and payment follow-ups.','Finance & accounting'],
+    ['operations','Operations & Administration','Connect everyday tasks, records and reporting.','Operations & administration'],
+    ['stock-logistics','Stock, Suppliers & Logistics','Track orders, stock levels and supplier updates.','Stock, suppliers & logistics'],
+    ['management','Management & Reporting','Bring key performance measures and management reports together.','Management & reporting']
   ];
-  const rows = functions.map(([id,name,description]) =>
-    '<tr><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(description)+'</small></td><td>$200</td><td>$20</td><td><button type="button" class="button cart-add-button" data-cart-add="'+id+'">Add to cart</button></td></tr>'
+  const recommended = report.recommendedFunctions || [];
+  const selected = catalog.filter(item => recommended.includes(item[3]));
+  if (!selected.length) {
+    return '<section class="report-section report-final"><h3>Donninger.AI product recommendations</h3><p class="report-chart-intro">Your answers do not yet identify a clear need for one of our eight automation products. We recommend clarifying your first customer, workflow and operating priorities before purchasing. You can revisit this assessment as your plan develops.</p></section>';
+  }
+  const rows = selected.map(([id,name,description]) =>
+    '<tr><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(description)+'</small></td><td>$200</td><td>$20</td><td><a class="button report-explore-link" href="automation.html?function='+id+'">View product</a> <button type="button" class="button cart-add-button" data-cart-add="'+id+'">Add to cart</button></td></tr>'
   ).join('');
-  return '<section class="report-section report-final"><h3>Choose your Donninger.AI package</h3>'+
-    '<p class="report-chart-intro">Choose the business functions your new or growing business needs. Every function has the same transparent pricing as the Business Automation Assessment.</p>'+
-    '<div class="report-pricing-table-wrap"><table class="report-pricing-table"><thead><tr><th>Business function</th><th>Setup</th><th>Monthly</th><th>Choose</th></tr></thead><tbody>'+rows+
-    '<tr><td><strong>Complete Donninger.AI Platform</strong><small>All eight functions · save $600 upfront and $60/month compared with buying separately</small></td><td>$1,000</td><td>$100</td><td><button type="button" class="button button-primary cart-add-button" data-cart-add-all>Add bundle</button></td></tr>'+
-    '</tbody></table></div>'+
-    '<div class="report-pricing-savings"><strong>Complete platform bundle</strong><span>All eight functions for $1,000 setup + $100/month. Buying all eight separately would cost $1,600 setup + $160/month.</span></div>'+
-    '<p class="report-field-note">The monthly fee includes maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Scope and integrations are confirmed before implementation.</p>'+
+  const count = selected.length;
+  const bundleRecommended = count >= 6;
+  const focusedSetup=count*200, focusedMonthly=count*20;
+  const bundleRow = bundleRecommended
+    ? '<tr><td><strong>Complete Donninger.AI Platform</strong><small>All eight functions · save $600 upfront and $60/month compared with buying separately</small></td><td>$1,000</td><td>$100</td><td><button type="button" class="button button-primary cart-add-button" data-cart-add-all>Add bundle</button></td></tr>'
+    : '';
+  const bundleNote = bundleRecommended
+    ? '<p class="report-pricing-recommendation">Because your assessment identifies '+count+' product areas, the complete platform is the better-value option if you expect to use the additional functions too.</p>'
+    : '<p class="report-pricing-recommendation">We recommend starting with these '+count+' product(s). Add other functions later if your business needs them.</p>';
+  return '<section class="report-section report-final"><h3>Donninger.AI products recommended for your business idea</h3>'+
+    '<p class="report-chart-intro">These products were selected from the needs you identified in your assessment. You can explore each product or add it to your request cart.</p>'+
+    '<div class="report-pricing-table-wrap"><table class="report-pricing-table"><thead><tr><th>Recommended product</th><th>Setup</th><th>Monthly</th><th>Next step</th></tr></thead><tbody>'+rows+bundleRow+'</tbody></table></div>'+
+    bundleNote+
+    '<p class="report-field-note">Recommended individual products: $'+focusedSetup.toLocaleString()+' setup + $'+focusedMonthly.toLocaleString()+'/month. The complete platform is $1,000 setup + $100/month. The monthly fee includes maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Scope and integrations are confirmed before implementation.</p>'+
     '</section>';
 }
 function buildBusinessReport() {
@@ -785,6 +797,25 @@ function buildFounderReport() {
   const stage = answers.stage || 'Just an idea';
   const resources = answers.resources || [];
   const support = answers.support || [];
+  const recommendedSet = new Set();
+  if (support.includes('Marketing and finding customers')) {
+    recommendedSet.add('Marketing');
+    recommendedSet.add('Sales & lead generation');
+  }
+  if (support.includes('Sales and customer support')) {
+    recommendedSet.add('Sales & lead generation');
+    recommendedSet.add('Customer service');
+  }
+  if (support.includes('Finance, budgeting and accounting')) recommendedSet.add('Finance & accounting');
+  if (support.includes('Website, technology and automation')) recommendedSet.add('Operations & administration');
+  if (support.includes('Operations, suppliers and delivery')) {
+    recommendedSet.add('Operations & administration');
+    recommendedSet.add('Stock, suppliers & logistics');
+  }
+  if (support.includes('Business strategy and growth')) recommendedSet.add('Management & reporting');
+  if (stage==='Already launched' || stage==='Already operating and looking to grow') {
+    if (support.includes('Validating demand and researching competitors')) recommendedSet.add('Management & reporting');
+  }
   const priorities = [];
   const add = (title,body)=>priorities.push({title,body});
   if (support.includes('Validating demand and researching competitors') || stage==='Just an idea' || stage==='Researching the market') add('Validate the problem and demand','Speak with potential customers, test whether the problem is important enough to pay to solve and compare existing alternatives.');
@@ -809,6 +840,7 @@ function buildFounderReport() {
     highlight:stage,
     highlightNote:resourceText,
     priorities:priorities.slice(0,4),
+    recommendedFunctions:[...recommendedSet],
     steps:['Write down the customer problem and the specific outcome your offer will deliver.','Validate demand through conversations, competitor research and a small real-world test.','Create a lean budget and a simple plan for making the first sale.','Use AI and automation to support repeatable tasks, while keeping important customer and financial decisions under human control.'],
     disclaimer:'This is an initial, rules-based planning report, not legal, tax, investment or financial advice. Requirements vary by country and industry. Validate assumptions with customers and qualified local professionals before making major commitments.'
   };
