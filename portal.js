@@ -96,7 +96,7 @@ async function loadQualificationProfile(){
 document.getElementById("functionDetailContent").addEventListener("change",async e=>{
  const select=e.target.closest(".pipeline-stage-select");if(!select)return;const leadId=select.dataset.leadId,stage=select.value;select.disabled=true;
  try{const r=await fetch("/api/sales/pipeline",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_id:leadId,stage})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not update pipeline stage.");await loadSalesPipeline();await loadQualifiedLeads();await loadUnqualifiedLeads();}
- catch(err){count.textContent="Pipeline update failed: "+err.message;await loadSalesPipeline();}
+ catch(err){const status=document.getElementById("salesPipelineCount");if(status)status.textContent="Pipeline update failed: "+err.message;await loadSalesPipeline();}
  finally{select.disabled=false;}
 });
 document.getElementById("functionDetailContent").addEventListener("submit",async e=>{
