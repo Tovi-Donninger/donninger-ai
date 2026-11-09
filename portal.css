@@ -62,3 +62,14 @@
 .qualification-loading-finished .qualification-loading-panel{animation:qualificationFinish .25s ease-out}
 @keyframes qualificationFinish{from{transform:translateY(5px);opacity:.7}to{transform:translateY(0);opacity:1}}
 @media(max-width:600px){.qualification-loading-panel{padding:24px 18px 20px}.qualification-loading-steps{justify-content:flex-start;gap:10px 16px}.qualification-loading-panel h2{font-size:21px}}
+
+
+/* Self-test sales outreach composer */
+.sales-outreach-composer{margin-top:22px;padding:22px;border:1px solid rgba(75,150,220,.22);border-radius:16px;background:rgba(240,246,253,.65);display:grid;gap:14px}
+.sales-outreach-composer[hidden]{display:none}
+.sales-outreach-composer label{display:grid;gap:7px;font-weight:600;color:#24344e}
+.sales-outreach-composer input:not([type=checkbox]),.sales-outreach-composer textarea{width:100%;box-sizing:border-box;border:1px solid #d4deeb;border-radius:10px;padding:12px 14px;background:#fff;color:#17243b;font:inherit}
+.sales-outreach-composer textarea{resize:vertical;line-height:1.6}
+.sales-outreach-composer .sales-outreach-approval{display:flex;align-items:flex-start;gap:10px;font-size:13px;font-weight:500}
+.sales-outreach-composer .sales-outreach-approval input{margin-top:3px}
+.sales-outreach-composer .portal-button:disabled{opacity:.5;cursor:not-allowed}
