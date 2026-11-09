@@ -82,10 +82,22 @@ document.getElementById("functionDetailContent").addEventListener("submit",async
  try{const r=await fetch("/api/sales/qualification-profile",{method:"PUT",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({criteria:Object.fromEntries(new FormData(form).entries())})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save profile.");s.textContent="Saved · Profile version "+d.profile.version;}catch(err){s.textContent=err.message;}finally{b.disabled=false;}
 });
 document.getElementById("functionDetailContent").addEventListener("click",async e=>{
+ if(e.target.closest("#selectAllQualifiedLeads")){
+  const master=document.getElementById("selectAllQualifiedLeads"),checks=[...document.querySelectorAll(".qualified-lead-select")];checks.forEach(box=>box.checked=master.checked);
+  const selected=checks.filter(box=>box.checked).length,button=document.getElementById("contactQualifiedLeads");if(button){button.disabled=selected===0;button.textContent="Contact Selected Leads ("+selected+") ✉";}
+ }
+ if(e.target.closest(".qualified-lead-select")){
+  const checks=[...document.querySelectorAll(".qualified-lead-select")],selected=checks.filter(box=>box.checked).length,master=document.getElementById("selectAllQualifiedLeads"),button=document.getElementById("contactQualifiedLeads");
+  if(master){master.checked=selected===checks.length&&checks.length>0;master.indeterminate=selected>0&&selected<checks.length;}
+  if(button){button.disabled=selected===0;button.textContent="Contact Selected Leads ("+selected+") ✉";}
+ }
  if(e.target.closest("#contactQualifiedLeads")){
   const button=document.getElementById("contactQualifiedLeads"),composer=document.getElementById("salesOutreachComposer"),status=document.getElementById("salesOutreachStatus");
   if(!button||!composer||!status)return;
-  button.disabled=true;status.textContent="Gemini is preparing a personalised sales email for your qualified test lead…";
+  const selected=[...document.querySelectorAll(".qualified-lead-select:checked")].map(box=>box.dataset.email.toLowerCase());
+  if(!selected.length){status.textContent="Select at least one qualified lead first.";composer.hidden=false;return;}
+  if(selected.length!==1||selected[0]!=="tovidonninger@gmail.com"){status.textContent="For this first test, email sending is restricted to the single authorised Tovi test lead. Other selected prospects will not be contacted.";composer.hidden=false;return;}
+  button.disabled=true;status.textContent="Gemini is preparing a personalised sales email for your selected qualified test lead…";
   try{
    const r=await fetch("/api/sales/contact-test-lead",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({action:"draft"})});
    const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not prepare the email draft.");
@@ -178,6 +190,11 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
 
 async function loadQualifiedLeads(){
  const count=document.getElementById("qualifiedLeadCount"),host=document.getElementById("qualifiedLeadTable");if(!host)return;count.textContent="Loading qualified leads…";
- try{const r=await fetch("/api/sales/qualified-leads",{credentials:"same-origin",cache:"no-store"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load qualified leads.");const rows=d.qualified_leads||[];count.textContent=rows.length+" qualified leads saved";host.innerHTML=rows.length?'<table class="sales-lead-table"><thead><tr><th>Prospect</th><th>Company</th><th>Contact</th><th>Fit score</th><th>Priority</th><th>Qualification</th></tr></thead><tbody>'+rows.map(v=>'<tr><td><strong>'+escapeHtml(v.first_name+" "+(v.last_name||""))+'</strong></td><td>'+escapeHtml(v.company||"—")+'</td><td>'+escapeHtml(v.email||v.phone||"—")+'</td><td><strong>'+v.fit_score+'/100</strong></td><td><span class="priority-'+escapeHtml(v.priority)+'">'+escapeHtml(v.priority)+'</span></td><td>'+escapeHtml(v.qualification_summary||"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="sales-empty-state">No leads have been saved as qualified yet. Run Qualify Leads to see the detailed assessment breakdown above.</div>';}catch(e){count.textContent="Unable to load qualified leads";host.textContent=e.message;}
+ try{
+  const r=await fetch("/api/sales/qualified-leads",{credentials:"same-origin",cache:"no-store"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load qualified leads.");
+  const rows=d.qualified_leads||[];count.textContent=rows.length+" qualified leads saved";
+  host.innerHTML=rows.length?'<table class="sales-lead-table"><thead><tr><th><input type="checkbox" id="selectAllQualifiedLeads" aria-label="Select all qualified leads"></th><th>Prospect</th><th>Company</th><th>Contact</th><th>Fit score</th><th>Priority</th><th>Qualification</th></tr></thead><tbody>'+rows.map(v=>'<tr><td><input type="checkbox" class="qualified-lead-select" aria-label="Select '+escapeHtml(v.first_name+" "+(v.last_name||""))+'" data-email="'+escapeHtml(v.email||"")+'"></td><td><strong>'+escapeHtml(v.first_name+" "+(v.last_name||""))+'</strong></td><td>'+escapeHtml(v.company||"—")+'</td><td>'+escapeHtml(v.email||v.phone||"—")+'</td><td><strong>'+v.fit_score+'/100</strong></td><td><span class="priority-'+escapeHtml(v.priority)+'">'+escapeHtml(v.priority)+'</span></td><td>'+escapeHtml(v.qualification_summary||"—")+'</td></tr>').join("")+'</tbody></table>':'<div class="sales-empty-state">No leads have been saved as qualified yet. Run Qualify Leads to see the detailed assessment breakdown above.</div>';
+  const bulk=document.getElementById("contactQualifiedLeads");if(bulk){bulk.disabled=!rows.length;bulk.textContent="Contact Selected Leads (0) ✉";}
+ }catch(e){count.textContent="Unable to load qualified leads";host.textContent=e.message;}
 }
 
