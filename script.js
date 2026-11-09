@@ -470,7 +470,7 @@ async function createAssessmentPdf(report,isBusiness) {
       'Management & reporting':'You want strategic direction and growth visibility. This package can bring agreed business measures into recurring reports so you can spot issues and make decisions with clearer information.'
     };
     const founderProductText=founderProducts.length
-      ? founderProducts.map((name,i)=>(i+1)+'. '+name+'\\nWhy we selected it: '+(supportReasons[name]||'This function supports an area you identified in the assessment.')+'\\nHow it supports your goals: it gives you a repeatable process to build on as the business moves from '+(answers.stage||'its current stage').toLowerCase()+' towards its next milestone.\\nInvestment: $200 one-time setup + $20/month.').join('\\n\\n')
+      ? founderProducts.map((name,i)=>(i+1)+'. '+name+'\\nWhy it fits: '+(supportReasons[name]||'This function supports an area you identified in the assessment.')+'\\nGoal alignment: build a repeatable process for your '+(answers.stage||'current-stage').toLowerCase()+' business, with room to expand as demand grows. $200 setup + $20/month.').join('\\n\\n')
       : 'No paid product is recommended from the answers supplied. We suggest clarifying your first customer, workflow and operating priorities before selecting a package.';
     addField(p4,'founder_recommended_products',founderProductText,LEFT,133,CONTENT,235,{fontSize:8,maxLength:1800});
     heading(p4,'Package price comparison',388);
