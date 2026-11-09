@@ -469,6 +469,7 @@ async function handleAdminMeetingDecision(request, env) {
 
   const accept=await meetingToken(),decline=await meetingToken();
   const expires=new Date(Date.now()+48*60*60*1000).toISOString();
+  let emailDelivered=false;
   try{
     await env.DB.batch([
       env.DB.prepare("DELETE FROM sales_appointment_tokens WHERE appointment_id=? AND organisation_id=? AND used_at IS NULL").bind(id,org),
@@ -485,13 +486,17 @@ async function handleAdminMeetingDecision(request, env) {
       acceptUrl:origin+"/meeting/respond?token="+encodeURIComponent(accept),
       declineUrl:origin+"/meeting/respond?token="+encodeURIComponent(decline)
     });
+    emailDelivered=true;
     await env.DB.batch([
       env.DB.prepare("UPDATE sales_appointments SET confirmation_email_sent_at=?,updated_at=? WHERE id=? AND organisation_id=? AND admin_accepted_at IS NOT NULL").bind(new Date().toISOString(),new Date().toISOString(),id,org),
       env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_admin_accepted',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,requested_start_at:start.toISOString(),client_email_sent:true}),auth.session.email)
     ]);
     return json({success:true,status:"awaiting_client",email_sent:true,message:"Administrator approval recorded and the client confirmation email was sent."});
   }catch(error){
-    console.error("Meeting confirmation email failed:",error);
+    console.error("Meeting confirmation processing failed:",error);
+    if(emailDelivered){
+      return json({success:true,status:"awaiting_client",email_sent:true,message:"The client confirmation email was sent. The meeting remains open for the client's response; an activity-log update needs attention."});
+    }
     await env.DB.batch([
       env.DB.prepare("DELETE FROM sales_appointment_tokens WHERE appointment_id=? AND organisation_id=? AND used_at IS NULL").bind(id,org),
       env.DB.prepare("UPDATE sales_appointments SET admin_accepted_at=NULL,confirmation_email_sent_at=NULL,updated_at=? WHERE id=? AND organisation_id=? AND status='requested'").bind(new Date().toISOString(),id,org)
