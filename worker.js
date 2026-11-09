@@ -100,9 +100,54 @@ async function handleReportSend(request, env) {
     return json({ error: "The email service could not be reached. Please try again." }, 502);
   }
 }
+
+async function requireAdmin(request, env) {
+  if (!env.DB) return { error: json({ error: "Database is not connected to this Worker." }, 503) };
+  const session = await readSession(request, env.SESSION_SECRET);
+  if (!session) return { error: json({ error: "Please sign in to access the sales workspace." }, 401) };
+  return { session };
+}
+async function handleSalesLeads(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+  const organisationId = "dev-donninger";
+  if (request.method === "GET") {
+    const result = await env.DB.prepare(
+      "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, interest_status, created_at, updated_at FROM leads WHERE organisation_id = ? ORDER BY created_at DESC LIMIT 200"
+    ).bind(organisationId).all();
+    return json({ leads: result.results || [] });
+  }
+  if (request.method === "POST") {
+    const length = Number(request.headers.get("content-length") || 0);
+    if (length > 20000) return json({ error: "Lead details are too large." }, 413);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON request." }, 400); }
+    const firstName = String(body.first_name || "").trim().slice(0, 100);
+    const lastName = String(body.last_name || "").trim().slice(0, 100);
+    const email = String(body.email || "").trim().slice(0, 254);
+    const phone = String(body.phone || "").trim().slice(0, 40);
+    const company = String(body.company || "").trim().slice(0, 160);
+    const jobTitle = String(body.job_title || "").trim().slice(0, 120);
+    const customerNeed = String(body.customer_need || "").trim().slice(0, 2000);
+    const source = String(body.source || "manual").trim().slice(0, 80);
+    const contactPermission = ["unknown","consent_given","existing_customer_basis","legitimate_interest_reviewed","do_not_contact"].includes(body.contact_permission) ? body.contact_permission : "unknown";
+    if (!firstName) return json({ error: "First name is required." }, 400);
+    if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+    const id = crypto.randomUUID();
+    await env.DB.prepare(
+      "INSERT INTO leads (id, organisation_id, first_name, last_name, email, phone, company, job_title, source, customer_need, contact_permission) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    ).bind(id, organisationId, firstName, lastName, email, phone, company, jobTitle, source, customerNeed, contactPermission).run();
+    await env.DB.prepare(
+      "INSERT INTO sales_activity (id, organisation_id, lead_id, activity_type, details_json, actor) VALUES (?, ?, ?, 'lead_created', ?, ?)"
+    ).bind(crypto.randomUUID(), organisationId, id, JSON.stringify({ source }), auth.session.email).run();
+    return json({ success: true, lead: { id, first_name: firstName, last_name: lastName, email, phone, company, job_title: jobTitle, source, customer_need: customerNeed, status: "new", contact_permission: contactPermission } }, 201);
+  }
+  return json({ error: "Method not allowed." }, 405, { allow: "GET, POST" });
+}
 async function handleApi(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/api/reports/send") return handleReportSend(request, env);
+  if (url.pathname === "/api/sales/leads") return handleSalesLeads(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     if (!env.DEV_ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Development authentication is not configured. Add the required Worker secrets in Cloudflare." }, 503);
     if (!env.DEV_ADMIN_ENABLED || env.DEV_ADMIN_ENABLED !== "true") return json({ error: "Development administrator access is disabled." }, 403);
