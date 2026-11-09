@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS sales_appointments (
   duration_minutes INTEGER NOT NULL DEFAULT 30,
   timezone TEXT NOT NULL DEFAULT 'Asia/Jerusalem',
   prospect_timezone TEXT NOT NULL DEFAULT '',
+  prospect_accepted_at TEXT,
+  admin_accepted_at TEXT,
   meeting_provider TEXT NOT NULL DEFAULT 'zoom',
   zoom_meeting_id TEXT NOT NULL DEFAULT '',
   zoom_join_url TEXT NOT NULL DEFAULT '',
@@ -40,3 +42,22 @@ CREATE TABLE IF NOT EXISTS sales_appointments (
 
 CREATE INDEX IF NOT EXISTS idx_sales_appointments_org_start
 ON sales_appointments (organisation_id, confirmed_start_at);
+
+CREATE TABLE IF NOT EXISTS sales_email_messages (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL REFERENCES organisations(id) ON DELETE CASCADE,
+  lead_id TEXT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+  gmail_message_id TEXT NOT NULL UNIQUE,
+  gmail_thread_id TEXT NOT NULL DEFAULT '',
+  direction TEXT NOT NULL CHECK (direction IN ('inbound','outbound')),
+  sender_email TEXT NOT NULL DEFAULT '',
+  recipient_email TEXT NOT NULL DEFAULT '',
+  subject TEXT NOT NULL DEFAULT '',
+  body_text TEXT NOT NULL DEFAULT '',
+  intent TEXT NOT NULL DEFAULT 'unknown',
+  received_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_sales_email_messages_lead
+ON sales_email_messages (organisation_id, lead_id, created_at DESC);
