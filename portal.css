@@ -92,3 +92,8 @@
 .sales-pipeline-lead select{width:100%;min-width:0;border:1px solid #d7e1ed;border-radius:8px;padding:8px;background:#fff;color:#24344e;font:inherit;font-size:12px}
 @media(max-width:900px){.sales-pipeline-board{grid-template-columns:repeat(2,minmax(220px,1fr))}}
 @media(max-width:560px){.sales-pipeline-board{grid-template-columns:repeat(6,minmax(230px,1fr))}}
+
+/* Admin controls for the dual-approval meeting workflow */
+.meeting-approval-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.meeting-approval-actions .portal-button{font-size:12px;padding:9px 12px}
+.meeting-approval-actions .portal-button:disabled{opacity:.55;cursor:wait}
