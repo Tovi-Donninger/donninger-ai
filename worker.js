@@ -409,6 +409,65 @@ async function handleUnqualifiedLeads(request,env){
  const rows=await env.DB.prepare("SELECT u.lead_id,u.fit_score,u.qualification_summary,u.qualification_json,u.assessed_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM unqualified_leads u JOIN leads l ON l.id=u.lead_id WHERE u.organisation_id=? ORDER BY u.assessed_at DESC LIMIT 200").bind("dev-donninger").all();
  return json({unqualified_leads:rows.results||[]});
 }
+
+async function handleSalesAppointments(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+
+  if (request.method !== "GET") {
+    return json({ error: "Method not allowed." }, 405, { allow: "GET" });
+  }
+
+  const org = "dev-donninger";
+
+  const rows = await env.DB.prepare(`
+    WITH latest_emails AS (
+      SELECT
+        lead_id,
+        direction,
+        sender_email,
+        subject,
+        body_text,
+        received_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY lead_id
+          ORDER BY COALESCE(received_at, created_at) DESC
+        ) AS rn
+      FROM sales_email_messages
+      WHERE organisation_id = ?
+    )
+    SELECT
+      a.id AS appointment_id,
+      a.lead_id,
+      a.status,
+      a.requested_start_at,
+      a.confirmed_start_at,
+      a.duration_minutes,
+      a.timezone,
+      a.prospect_timezone,
+      a.prospect_accepted_at,
+      a.admin_accepted_at,
+      a.created_at,
+      l.first_name,
+      l.last_name,
+      l.email,
+      l.company,
+      e.direction AS latest_email_direction,
+      e.sender_email AS latest_email_sender,
+      e.subject AS latest_email_subject,
+      substr(e.body_text, 1, 2000) AS latest_email_body,
+      e.received_at AS latest_email_at
+    FROM sales_appointments a
+    JOIN leads l ON l.id = a.lead_id
+    LEFT JOIN latest_emails e ON e.lead_id = a.lead_id AND e.rn = 1
+    WHERE a.organisation_id = ?
+      AND a.status IN ('requested', 'confirmed')
+    ORDER BY a.created_at DESC
+    LIMIT 200
+  `).bind(org, org).all();
+
+  return json({ appointments: rows.results || [] });
+}
 async function handleSalesPipeline(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
@@ -420,7 +479,10 @@ async function handleSalesPipeline(request, env) {
   if (request.method === 'POST') {
     let body; try { body = await request.json(); } catch { return json({ error: 'Invalid request.' }, 400); }
     const leadId = String(body.lead_id || '').trim(), stage = String(body.stage || '').trim();
-    const allowed = ['contacted','meeting_requested','meeting_confirmed','meeting_completed','converted','lost'];
+if (stage === 'meeting_confirmed') {
+  return json({ error: 'A meeting can only be confirmed after both the administrator and client have accepted the same time.' }, 403);
+}
+    const allowed = ['contacted','meeting_requested','meeting_completed','converted','lost'];
     if (!leadId || !allowed.includes(stage)) return json({ error: 'Choose a valid lead and pipeline stage.' }, 400);
     const lead = await env.DB.prepare('SELECT id,pipeline_stage FROM leads WHERE id=? AND organisation_id=?').bind(leadId, org).first();
     if (!lead) return json({ error: 'Lead not found.' }, 404);
@@ -433,6 +495,42 @@ async function handleSalesPipeline(request, env) {
     return json({ success: true, lead_id: leadId, pipeline_stage: stage });
   }
   return json({ error: 'Method not allowed.' }, 405, { allow: 'GET, POST' });
+}
+async function handleSalesEmailHistory(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+
+  if (request.method !== 'GET') {
+    return json({ error: 'Method not allowed.' }, 405, { allow: 'GET' });
+  }
+
+  const org = 'dev-donninger';
+  const url = new URL(request.url);
+  const leadId = String(url.searchParams.get('lead_id') || '').trim();
+
+  if (!leadId || leadId.length > 200) {
+    return json({ error: 'A valid lead ID is required.' }, 400);
+  }
+
+  const lead = await env.DB.prepare(
+    'SELECT id FROM leads WHERE id=? AND organisation_id=?'
+  ).bind(leadId, org).first();
+
+  if (!lead) return json({ error: 'Lead not found.' }, 404);
+
+  const messages = await env.DB.prepare(
+    'SELECT id,gmail_message_id,direction,sender_email,recipient_email,subject,body_text,intent,received_at,created_at FROM sales_email_messages WHERE organisation_id=? AND lead_id=? ORDER BY created_at DESC LIMIT 100'
+  ).bind(org, leadId).all();
+
+  const activities = await env.DB.prepare(
+    'SELECT activity_type,details_json,actor,created_at FROM sales_activity WHERE organisation_id=? AND lead_id=? ORDER BY created_at DESC LIMIT 100'
+  ).bind(org, leadId).all();
+
+  return json({
+    success: true,
+    messages: messages.results || [],
+    activities: activities.results || []
+  });
 }
 async function handleSalesContactTestLead(request, env) {
   const auth = await requireAdmin(request, env);
@@ -531,7 +629,28 @@ async function handleSalesContactTestLead(request, env) {
   }
 }
 
+function cleanSalesEmailBody(value) {
+  let text = String(value || "").replace(/\r\n/g, "\n").trim();
 
+  const cutPatterns = [
+    /\bOn .{5,200}wrote:/im,
+    /^\s*From:\s*.+$/im,
+    /^\s*-{2,}\s*Original Message\s*-{2,}\s*$/im,
+    /^\s*_{5,}\s*$/im,
+    /^\s*Begin forwarded message:\s*$/im
+  ];
+
+  let cutAt = text.length;
+
+  for (const pattern of cutPatterns) {
+    const match = pattern.exec(text);
+    if (match && match.index < cutAt) cutAt = match.index;
+  }
+
+  text = text.slice(0, cutAt).trim();
+
+  return text.slice(0, 12000);
+}
 async function handleSalesReplyIngest(request, env) {
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
   if (!env.DONNINGER_EMAIL_TOKEN) return json({ error: "Reply ingestion is not configured." }, 503);
@@ -545,7 +664,7 @@ async function handleSalesReplyIngest(request, env) {
   const sender = String(body.sender_email || "").trim().toLowerCase().slice(0, 254);
   const recipient = String(body.recipient_email || "").trim().toLowerCase().slice(0, 254);
   const subject = String(body.subject || "").trim().slice(0, 300);
-  const messageText = String(body.body || "").trim().slice(0, 12000);
+  const messageText = cleanSalesEmailBody(body.body);
   const receivedAt = String(body.received_at || "").trim().slice(0, 40);
   if (!messageId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sender) || !messageText) {
     return json({ error: "The reply is missing a valid message ID, sender or message body." }, 400);
@@ -593,7 +712,7 @@ async function handleSalesReplyIngest(request, env) {
   const keyPoints = Array.isArray(analysis.key_points) ? analysis.key_points.slice(0, 10).map(v => String(v).slice(0, 300)) : [];
   const suggestedReply = String(analysis.suggested_reply || "").slice(0, 5000);
   const id = crypto.randomUUID();
-  const stageUpdate = intent === "meeting_request" ? "meeting_requested" : intent === "not_interested" ? "lost" : null;
+  const stageUpdate = null;
   const statements = [
     env.DB.prepare("INSERT INTO sales_email_messages (id,organisation_id,lead_id,gmail_message_id,gmail_thread_id,direction,sender_email,recipient_email,subject,body_text,intent,received_at) VALUES (?,?,?,?,?,'inbound',?,?,?,?,?,?)")
       .bind(id,org,lead.id,messageId,threadId,sender,recipient,subject,messageText,intent,receivedAt || new Date().toISOString()),
@@ -623,7 +742,9 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/qualify-batch") return handleBulkLeadQualification(request, env);
   if (url.pathname === "/api/sales/qualified-leads") return handleQualifiedLeads(request, env);
   if (url.pathname === "/api/sales/unqualified-leads") return handleUnqualifiedLeads(request, env);
+  if (url.pathname === "/api/sales/appointments") return handleSalesAppointments(request, env);
   if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
+  if (url.pathname === "/api/sales/email-history") return handleSalesEmailHistory(request, env);
   if (url.pathname === "/api/sales/contact-test-lead") return handleSalesContactTestLead(request, env);
   if (url.pathname === "/api/sales/email-reply") return handleSalesReplyIngest(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
