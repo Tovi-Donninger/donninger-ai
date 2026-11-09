@@ -360,23 +360,36 @@ async function createAssessmentPdf(report,isBusiness) {
     const p3=addPage('Recommendations & opportunities',3);
     heading(p3,'Recommended areas to investigate',100);
     const recs=report.recommendedFunctions||[];
-    const recList=recs.length?recs.map((name,i)=>(i+1)+'. '+name+': '+(functionDetails[name]?.task||'Review the current workflow, tools, ownership and approval requirements.')).join('\n\n'):'No specific paid function is recommended from the information currently available. Start by mapping one repetitive workflow and confirming its frequency, tools, owner and approval steps.';
-    addField(p3,'recommendation_detail',recList,LEFT,133,CONTENT,235,{fontSize:9,maxLength:1800});
-    heading(p3,'Growth opportunities',397);
+    const taskSignals=(answers.tasks||[]).join('; ');
+    const goalReasons={
+      'Win more customers and respond faster':'You identified customer acquisition and response speed as a priority.',
+      'Reduce admin and operating costs':'You want to reduce repetitive administration and the cost of day-to-day work.',
+      'Improve customer experience':'You want customers to receive more consistent and timely service.',
+      'Make the team more productive':'You want staff time freed from repeatable tasks so it can be used on higher-value work.',
+      'Improve visibility, reporting and decisions':'You want clearer operational information to support faster, better-informed decisions.',
+      'Scale without immediately hiring more people':'You want processes that can support more volume without every increase creating the same increase in manual workload.',
+      'Not sure — show me the biggest opportunities':'You asked us to identify the most promising opportunities from the operational issues you described.'
+    };
+    const recList=recs.length?recs.map((name,i)=>{
+      const task=functionDetails[name]?.task||'Review recurring workflows, tools, ownership and approval requirements.';
+      const evidence=(name==='Sales & lead generation'&&/enquir|lead|quotes|proposals/i.test(taskSignals))?'You highlighted enquiries, leads or sales preparation as a repetitive task.':
+        (name==='Customer service'&&/customer questions/i.test(taskSignals))?'You highlighted answering common customer questions.':
+        (name==='Finance & accounting'&&/invoice|payments/i.test(taskSignals))?'You highlighted invoice preparation or payment follow-up.':
+        (name==='Human resources & recruitment'&&/recruitment|staff administration/i.test(taskSignals))?'You highlighted recruitment or staff administration.':
+        (name==='Stock, suppliers & logistics'&&/stock|suppliers/i.test(taskSignals))?'You highlighted stock, orders or supplier coordination.':
+        (name==='Management & reporting'&&/spreadsheets|reports|systems/i.test(taskSignals))?'You highlighted spreadsheet, reporting or cross-system work.':
+        (name==='Operations & administration'&&/scheduling|appointments|copying/i.test(taskSignals))?'You highlighted scheduling, appointments or copying information between systems.':
+        (answers.interestedFunctions||[]).includes(name)?'You also selected this function as an area you would like to improve.':'This recommendation is supported by the business goal you selected.';
+      return (i+1)+'. '+name+'\nWhy we selected it: '+evidence+' '+(goalReasons[goal]||'It aligns with the improvement you want to make.')+'\nWhat the package can address: '+task+'.\nBusiness value: a connected workflow can reduce avoidable handovers, improve consistency and give your team more capacity to serve customers and grow.';
+    }).join('\n\n'):'No specific paid function is recommended from the information currently available. Start by mapping one repetitive workflow before selecting a package.';
+    addField(p3,'recommendation_detail',recList,LEFT,133,CONTENT,300,{fontSize:8,maxLength:2600});
+    heading(p3,'How integration can accelerate growth',457);
+    const integrationText='The greatest opportunity is not simply automating isolated tasks. Donninger.AI can connect agreed workflows across the functions you choose: for example, a new enquiry can flow into lead follow-up, customer onboarding, service delivery and management reporting. This reduces repeated data entry and missed handovers, gives staff a clearer view of what needs attention and helps the business handle more customers with existing capacity. As you grow, additional functions can be connected around the same operating process. The exact integrations depend on your existing software, available access and an agreed implementation scope.';
+    addField(p3,'integration_growth',integrationText,LEFT,490,CONTENT,118,{fontSize:8,maxLength:1000});
+    heading(p3,'What this could mean for your business',635);
     const growth=(report.growth||[]);
-    const growthText=growth.length?growth.map((g,i)=>(i+1)+'. '+g.title+': '+g.body).join('\n\n'):'No additional growth opportunities were identified from the answers supplied.';
-    addField(p3,'growth_opportunities',growthText,LEFT,430,CONTENT,150,{fontSize:9,maxLength:1100});
-    heading(p3,'How we reached these findings',609);
-    const methodText=[
-      answers.company?'Business: '+answers.company:'',
-      answers.industry?'Industry: '+answers.industry:'',
-      answers.team?'Team size: '+answers.team:'',
-      'Current functions: '+((answers.functions||[]).join(', ')||'Not specified'),
-      'Tasks highlighted: '+((answers.tasks||[]).join(', ')||'Not specified'),
-      'Primary goal: '+goal,
-      methodology
-    ].filter(Boolean).join('\n');
-    addField(p3,'methodology',methodText,LEFT,642,CONTENT,126,{fontSize:7.5,maxLength:1100});
+    const growthText=growth.length?growth.map((g,i)=>(i+1)+'. '+g.title+': '+g.body).join('\n'):'Measure the time and errors in your current process first, then compare the results after implementation.';
+    addField(p3,'growth_opportunities',growthText,LEFT,668,CONTENT,96,{fontSize:7.5,maxLength:650});
 
     const p4=addPage('Pricing & important information',4);
     heading(p4,'Indicative pricing breakdown',100);
@@ -421,11 +434,13 @@ async function createAssessmentPdf(report,isBusiness) {
     heading(p3,'Recommended priorities',100);
     const priorities=(report.priorities||[]);
     const priorityText=priorities.map((item,i)=>(i+1)+'. '+item.title+': '+item.body).join('\n\n');
-    addField(p3,'founder_priorities',priorityText||'Your answers did not identify specific priorities yet.',LEFT,133,CONTENT,240,{fontSize:9,maxLength:1700});
-    heading(p3,'Practical next steps',405);
-    addField(p3,'founder_roadmap',(report.steps||[]).map((step,i)=>(i+1)+'. '+step).join('\n\n'),LEFT,438,CONTENT,210,{fontSize:9,maxLength:1300});
-    heading(p3,'Planning notes',681);
-    addField(p3,'founder_notes','Use this space to record assumptions, questions and decisions as you validate the business idea.',LEFT,714,CONTENT,54,{fontSize:8,maxLength:350});
+    addField(p3,'founder_priorities',priorityText||'Your answers did not identify specific priorities yet.',LEFT,133,CONTENT,190,{fontSize:8.5,maxLength:1450});
+    heading(p3,'How Donninger.AI integration can accelerate growth',345);
+    const founderIntegration='A new business often starts with disconnected tools and manual work. Donninger.AI is designed to connect the workflows you need as you launch: attracting and capturing enquiries, following up prospects, supporting customers, organising finance and coordinating delivery. When these processes share information and clear hand-offs, you can spend less time managing admin and more time validating your offer, serving customers and building revenue. You can begin with the functions that match your immediate priorities, then connect more as demand grows. Integrations and automation scope are confirmed with you before implementation.';
+    addField(p3,'founder_integration',founderIntegration,LEFT,378,CONTENT,112,{fontSize:8,maxLength:950});
+    heading(p3,'Your practical next steps',515);
+    addField(p3,'founder_roadmap',(report.steps||[]).map((step,i)=>(i+1)+'. '+step).join('\n\n'),LEFT,548,CONTENT,170,{fontSize:8,maxLength:1150});
+    addField(p3,'founder_notes','Build in stages, measure what works and expand the system as your customer base and operating needs grow.',LEFT,737,CONTENT,30,{fontSize:7.5,maxLength:250});
 
     const p4=addPage('Recommended products & pricing',4);
     const founderProducts=report.recommendedFunctions||[];
@@ -444,8 +459,18 @@ async function createAssessmentPdf(report,isBusiness) {
       'Management & reporting':'Business performance measures and management reporting.'
     };
     heading(p4,'Products selected for your business idea',100);
+    const supportReasons={
+      'Sales & lead generation':'You want help finding customers or building a repeatable sales process. This package can organise lead capture, qualification and follow-up so opportunities are less likely to be missed.',
+      'Marketing':'You identified marketing and customer discovery as a priority. This package can help plan campaigns, prepare content and track which activities attract interest.',
+      'Customer service':'You want to support customers consistently. This package can organise enquiries, common questions and follow-ups while keeping sensitive or unusual cases with a person.',
+      'Human resources & recruitment':'People and hiring processes may become important as the business grows. This package can help structure recruitment and routine people administration when you are ready to build a team.',
+      'Finance & accounting':'You identified budgeting and finance as a support need. This package can organise invoice, expense and payment workflows, with financial decisions and approvals remaining under your control.',
+      'Operations & administration':'You want technology and automation to support the business. This package can connect recurring tasks, records, requests and approvals so the business is easier to run.',
+      'Stock, suppliers & logistics':'You expect to manage suppliers, stock or delivery. This package can coordinate order updates, supplier reminders and stock alerts when connected to reliable source data.',
+      'Management & reporting':'You want strategic direction and growth visibility. This package can bring agreed business measures into recurring reports so you can spot issues and make decisions with clearer information.'
+    };
     const founderProductText=founderProducts.length
-      ? founderProducts.map((name,i)=>(i+1)+'. '+name+'\n'+(productDescriptions[name]||'A tailored workflow package based on the needs identified in your assessment.')+'\n$200 one-time setup + $20/month').join('\n\n')
+      ? founderProducts.map((name,i)=>(i+1)+'. '+name+'\\nWhy we selected it: '+(supportReasons[name]||'This function supports an area you identified in the assessment.')+'\\nHow it supports your goals: it gives you a repeatable process to build on as the business moves from '+(answers.stage||'its current stage').toLowerCase()+' towards its next milestone.\\nInvestment: $200 one-time setup + $20/month.').join('\\n\\n')
       : 'No paid product is recommended from the answers supplied. We suggest clarifying your first customer, workflow and operating priorities before selecting a package.';
     addField(p4,'founder_recommended_products',founderProductText,LEFT,133,CONTENT,235,{fontSize:8,maxLength:1800});
     heading(p4,'Package price comparison',388);
