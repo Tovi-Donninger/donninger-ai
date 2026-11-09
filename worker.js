@@ -522,13 +522,10 @@ async function handleClientMeetingResponse(request,env) {
     const purpose=decision==="accept"?"client_accept":"client_decline";
     const record=await env.DB.prepare("SELECT t.id AS token_id,t.appointment_id,a.lead_id,a.status,a.admin_accepted_at,l.first_name,l.email FROM sales_appointment_tokens t JOIN sales_appointments a ON a.id=t.appointment_id JOIN leads l ON l.id=a.lead_id WHERE t.token_hash=? AND t.organisation_id=? AND t.purpose=? AND t.used_at IS NULL AND t.expires_at>?").bind(hash,"dev-donninger",purpose,new Date().toISOString()).first();
     if(!record||record.status!=="requested")return new Response("This meeting response link has expired or has already been used.",{status:410});
-    const now=new Date().toISOString();
-    if(decision==="accept"&&!record.admin_accepted_at)return new Response("The administrator has not approved this meeting time yet.",{status:409});
     if(!record.admin_accepted_at)return new Response("The administrator has not approved this meeting time yet.",{status:409});
     const now=new Date().toISOString();
     const tokenUpdate=await env.DB.prepare("UPDATE sales_appointment_tokens SET used_at=? WHERE id=? AND used_at IS NULL AND expires_at>?").bind(now,record.token_id,now).run();
     if(!tokenUpdate.meta||tokenUpdate.meta.changes!==1)return new Response("This meeting link has already been used.",{status:410});
-    const targetStatus=decision==="accept"?"confirmed":"cancelled";
     const appointmentUpdate=decision==="accept"
       ? await env.DB.prepare("UPDATE sales_appointments SET prospect_accepted_at=?,status='confirmed',confirmed_start_at=requested_start_at,updated_at=? WHERE id=? AND status='requested' AND admin_accepted_at IS NOT NULL").bind(now,now,record.appointment_id).run()
       : await env.DB.prepare("UPDATE sales_appointments SET status='cancelled',client_declined_at=?,updated_at=? WHERE id=? AND status='requested' AND admin_accepted_at IS NOT NULL").bind(now,now,record.appointment_id).run();
