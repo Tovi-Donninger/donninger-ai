@@ -310,9 +310,9 @@ async function handleBulkLeadQualification(request,env){
     await env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id).run();
     notQualified.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,summary:result.summary||""});
    }
-  }catch(e){console.error("Bulk qualification failed for lead",lead.id,e);errors.push({lead_id:lead.id,name:lead.first_name,error:"AI assessment failed"});}
+  }catch(e){console.error("Bulk qualification failed for lead",lead.id,e);errors.push({lead_id:lead.id,name:lead.first_name,error:String(e.message||"AI assessment failed").slice(0,240)});}
  }
- return json({success:errors.length===0,profile_version:version,criteria,checked:leads.length,qualified_count:qualified.length,not_qualified_count:notQualified.length,failed_count:errors.length,qualified,not_qualified:notQualified,errors});
+ return json({success:errors.length===0,profile_version:version,model,source_lead_count:leads.length,criteria,checked:leads.length,qualified_count:qualified.length,not_qualified_count:notQualified.length,failed_count:errors.length,qualified,not_qualified:notQualified,errors});
 }
 async function handleQualifiedLeads(request,env){
  const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
