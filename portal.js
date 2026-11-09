@@ -119,6 +119,7 @@ async function loadSalesAppointments(){
       '<strong>'+escapeHtml(name)+'</strong>'+
       '<small>'+escapeHtml(v.company||"")+' · '+escapeHtml(v.email||"")+'</small>'+
       '<p><strong>Proposed time:</strong> '+escapeHtml(date)+'</p>'+
+      (v.discussion_summary?'<p><strong>Client proposal:</strong> '+escapeHtml(v.discussion_summary)+'</p>':"")+
       '<small>Timezone: '+escapeHtml(timezone)+'</small>'+
       '<p><strong>Latest email:</strong> '+escapeHtml(v.latest_email_subject||"No email subject")+'</p>'+
       email+
