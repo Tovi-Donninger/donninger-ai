@@ -429,6 +429,12 @@ async function createAssessmentPdf(report,isBusiness) {
     addField(p4,'founder_methodology',methodology,LEFT,133,CONTENT,120,{fontSize:9,maxLength:800});
     heading(p4,'Important assessment notes',282);
     addField(p4,'founder_disclaimer',report.disclaimer||'This is an initial planning report, not professional advice.',LEFT,315,CONTENT,120,{fontSize:9,maxLength:800});
+    heading(p4,'Recommended Donninger.AI products & packages',470);
+    drawText(p4,'Focused proposal: '+(report.recommendedFunctions||[]).length+' products',LEFT,505,7,regular,ink);
+    drawText(p4,'Individual pricing: $200 setup + $20/month per product. Complete platform: $1,000 setup + $100/month for all eight.',LEFT,532,7,bold,ink);
+    drawText(p4,(report.recommendedFunctions||[]).length>=5?'At five or more recommended products, the complete platform is the stronger-value option.':'Start with the focused products identified in this assessment. The complete platform remains available as your business grows.',LEFT,559,7,regular,ink);
+    heading(p4,'Pricing terms',620);
+    addField(p4,'founder_pricing_terms','Monthly fees include maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Implementation scope and integrations are confirmed before work begins.',LEFT,653,CONTENT,105,{fontSize:7,maxLength:700});
   }
   // Rasterise every finished page into a new image-only PDF, removing editable text objects and form fields.
   const sourceBytes=await pdf.save();
@@ -530,7 +536,7 @@ function renderReport() {
     '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>';
   const businessSections = isBusiness
     ? renderBusinessComparison(report)+renderBusinessPricing(report)
-    : renderFounderSections(report)+renderFinalRecommendations(report,false);
+    : renderFounderSections(report)+renderFinalRecommendations(report,false)+renderBusinessPricing(report);
   modalContent.innerHTML = intro+businessSections+
     '<section class="report-section report-notes"><h3>Important assessment notes</h3><p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p></section>'+
     renderDownloadReportSection()+
@@ -540,18 +546,17 @@ function renderReport() {
   bindDownloadReport();
 }
 function renderFounderSections(report) {
-  const idea = answers.idea || 'Business idea not specified';
-  const context = [answers.industry,answers.stage,answers.customer,answers.model].filter(Boolean);
-  const resources = answers.resources || [];
-  const recommendations = (report.priorities||[]).slice(0,4);
-  const opportunities = [
-    {title:'Validate demand before investing heavily',body:'Use customer conversations and a small real-world test to confirm that people will pay for the proposed solution.'},
-    {title:'Build a lean first version',body:'Start with the smallest useful offer and add systems only when real demand and repeatable processes justify them.'},
-    {title:'Create measurable growth milestones',body:'Track enquiries, conversion, revenue, delivery costs and customer feedback from the beginning.'}
-  ];
+  const idea=answers.idea||'Business idea not specified';
+  const context=[answers.industry,answers.stage,answers.customer,answers.model].filter(Boolean);
+  const resources=answers.resources||[];
+  const support=answers.support||[];
+  const priorities=(report.priorities||[]).slice(0,4);
+  const opportunities=[{title:'Validate demand before investing heavily',body:'Use customer conversations and a small real-world test to confirm that people will pay for the proposed solution.'},{title:'Build a lean first version',body:'Start with the smallest useful offer and add systems only when real demand and repeatable processes justify them.'},{title:'Create measurable growth milestones',body:'Track enquiries, conversion, revenue, delivery costs and customer feedback from the beginning.'}];
+  const products=(report.recommendedFunctions||[]).map(name=>({title:name,body:functionDetails[name]?.task||'Review this business function during planning.'}));
   return '<section class="report-section"><h3>1. What you told us</h3><div class="report-summary-panel"><strong>'+escapeHtml(idea)+'</strong><p>'+escapeHtml(context.join(' · ')||'Further business details can be confirmed during planning.')+'</p><small>'+escapeHtml(resources.length?resources.length+' resource area(s) already identified.':'Your available resources still need to be mapped.')+'</small></div></section>'+
-    '<section class="report-section"><h3>2. What we recommend</h3>'+renderReportItems(recommendations,'We need a little more information before recommending a specific starting point.')+'</section>'+
-    '<section class="report-section"><h3>3. Opportunities we identified</h3>'+renderReportItems(opportunities)+'</section>';
+    '<section class="report-section"><h3>2. What you want</h3><p class="report-chart-intro">The areas where you said you would most value help.</p>'+renderReportItems(support.map(item=>({title:item,body:'Considered alongside your business stage, target customer, revenue model and available resources.'})),'No specific support areas were selected.')+'</section>'+
+    '<section class="report-section"><h3>3. What we recommend</h3><p class="report-chart-intro">Practical priorities and Donninger.AI products identified from your answers.</p>'+renderReportItems(priorities,'We need more information before recommending a specific starting point.')+renderReportItems(products,'No Donninger.AI product is recommended yet.')+'</section>'+
+    '<section class="report-section"><h3>4. Opportunities we identified</h3>'+renderReportItems(opportunities)+'</section>';
 }
 function renderReportItems(items,emptyText) {
   if(!items || !items.length) return '<p class="report-field-note">'+escapeHtml(emptyText||'No additional items were identified from the information provided.')+'</p>';
@@ -666,7 +671,7 @@ function calculateBusinessProposal(report) {
   const count=(report.recommendedFunctions||[]).length;
   const individualSetup=count*200;
   const individualMonthly=count*20;
-  const recommendBundle=count>=6;
+  const recommendBundle=count>=5;
   return {count,individualSetup,individualMonthly,setup:recommendBundle?1000:individualSetup,monthly:recommendBundle?100:individualMonthly,totalFirstYear:(recommendBundle?1000:individualSetup)+(recommendBundle?100:individualMonthly)*12,recommendBundle};
 }
 function renderBusinessPricing(report) {
@@ -707,7 +712,7 @@ function renderFinalRecommendations(report,isBusiness) {
     '<tr><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(description)+'</small></td><td>$200</td><td>$20</td><td><a class="button report-explore-link" href="automation.html?function='+id+'">View product</a> <button type="button" class="button cart-add-button" data-cart-add="'+id+'">Add to cart</button></td></tr>'
   ).join('');
   const count = selected.length;
-  const bundleRecommended = count >= 6;
+  const bundleRecommended = count >= 5;
   const focusedSetup=count*200, focusedMonthly=count*20;
   const bundleRow = bundleRecommended
     ? '<tr><td><strong>Complete Donninger.AI Platform</strong><small>All eight functions · save $600 upfront and $60/month compared with buying separately</small></td><td>$1,000</td><td>$100</td><td><button type="button" class="button button-primary cart-add-button" data-cart-add-all>Add bundle</button></td></tr>'
