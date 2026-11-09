@@ -1,0 +1,2 @@
+first_name,last_name,email,phone,company,job_title,source,source_detail,campaign_code,customer_need,contact_permission,consent_recorded_at,contact_channel,estimated_value,currency,owner,notes
+Alex,Example,alex@example.com,+10000000000,Example Company,Operations Manager,website,Contact form,SPRING-DEMO,Interested in reducing manual quote follow-ups,consent_given,2026-11-01,email,2500,USD,Sales Team,DEMO DATA ONLY - replace with authorised lead information
