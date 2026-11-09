@@ -57,7 +57,10 @@ async function showSalesWorkspace(){
   try{const response=await fetch("/api/sales/leads",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify(data)});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not save lead.");form.reset();msg.textContent="Lead saved successfully.";await loadSalesLeads();}
   catch(error){msg.textContent=error.message;}finally{button.disabled=false;}
  });
+ host.insertAdjacentHTML("beforeend", `<section class="dash-card sales-appointments-card"><div class="sales-leads-heading"><div><div class="dash-eyebrow">MEETING MANAGEMENT</div><h3>Meeting Requests</h3></div><button class="text-action" id="refreshSalesAppointments" type="button">Refresh ↻</button></div><p id="salesAppointmentsCount" class="sales-lead-count">Loading meeting requests…</p><div id="salesAppointmentsBoard" class="sales-pipeline-board"></div></section>`);
  document.getElementById("refreshSalesLeads").addEventListener("click",loadSalesLeads);
+ document.getElementById("refreshSalesAppointments")?.addEventListener("click",loadSalesAppointments);
+   await loadSalesAppointments();
  showView("detail");
  await loadSalesLeads();
  await loadQualifiedLeads();
@@ -78,9 +81,60 @@ async function loadSalesPipeline(){
  const count=document.getElementById('salesPipelineCount'),host=document.getElementById('salesPipelineBoard');if(!host)return;count.textContent='Loading sales pipeline…';
  try{const r=await fetch('/api/sales/pipeline',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load sales pipeline.');const rows=d.pipeline_leads||[];count.textContent=rows.length+' leads currently in active sales stages';
  const stages=[['contacted','Contacted Leads'],['meeting_requested','Meeting Requested'],['meeting_confirmed','Meeting Confirmed'],['meeting_completed','Meeting Completed'],['converted','Converted'],['lost','Lost']];
- host.innerHTML=stages.map(([stage,label])=>{const items=rows.filter(v=>v.pipeline_stage===stage);const options=stages.filter(([value])=>value!==stage).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('');return '<section class="sales-pipeline-column"><header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+(items.length?items.map(v=>'<article class="sales-pipeline-lead"><strong>'+escapeHtml((v.first_name+' '+(v.last_name||'')).trim())+'</strong><small>'+escapeHtml(v.company||'')+' · '+escapeHtml(v.email||'')+'</small><p>'+escapeHtml(v.customer_need||'No customer need recorded')+'</p><label>Update stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(v.lead_id)+'"><option value="'+stage+'" selected>'+label+'</option>'+options+'</select></label></article>').join(''):'<div class="sales-empty-state">No leads in this stage.</div>')+'</section>';}).join('');
+ host.innerHTML=stages.map(([stage,label])=>{const items=rows.filter(v=>v.pipeline_stage===stage);const options=stages.filter(([value])=>value!==stage).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('');return '<section class="sales-pipeline-column"><header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+(items.length?items.map(v=>'<article class="sales-pipeline-lead"><strong>'+escapeHtml((v.first_name+' '+(v.last_name||'')).trim())+'</strong><small>'+escapeHtml(v.company||'')+' · '+escapeHtml(v.email||'')+'</small><p>'+escapeHtml(v.customer_need||'No customer need recorded')+'</p><label>Update stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(v.lead_id)+'"><option value="'+stage+'" selected>'+label+'</option>'+options+'</select></label><button type="button" class="sales-email-history-button" data-lead-id="'+escapeHtml(v.lead_id)+'">View email history</button><div class="sales-email-history" hidden></div></article>').join(''):'<div class="sales-empty-state">No leads in this stage.</div>')+'</section>';}).join('');
  }catch(e){count.textContent='Unable to load pipeline';host.textContent=e.message;}
 }
+
+async function loadSalesAppointments(){
+ const count=document.getElementById("salesAppointmentsCount");
+ const host=document.getElementById("salesAppointmentsBoard");
+ if(!host||!count)return;
+
+ count.textContent="Loading meeting requests…";
+ host.innerHTML="";
+
+ try{
+  const r=await fetch("/api/sales/appointments",{credentials:"same-origin",cache:"no-store"});
+  const d=await r.json();
+  if(!r.ok)throw new Error(d.error||"Could not load meeting requests.");
+
+  const rows=d.appointments||[];
+  count.textContent=rows.length+" active or confirmed meeting"+(rows.length===1?"":"s");
+
+  const groups=[
+   ["Pending admin review",rows.filter(v=>v.status==="requested"&&!v.admin_accepted_at)],
+   ["Awaiting client confirmation",rows.filter(v=>v.status==="requested"&&v.admin_accepted_at)],
+   ["Confirmed meetings",rows.filter(v=>v.status==="confirmed")]
+  ];
+
+  host.innerHTML=groups.map(([label,items])=>
+   '<section class="sales-pipeline-column">'+
+    '<header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+
+    (items.length?items.map(v=>{
+     const name=(v.first_name+" "+(v.last_name||"")).trim();
+     const date=v.requested_start_at?new Date(v.requested_start_at).toLocaleString():"Time not yet proposed";
+     const timezone=v.prospect_timezone||v.timezone||"Timezone not specified";
+     const email=v.latest_email_body?'<p>'+escapeHtml(v.latest_email_body.slice(0,500))+'</p>':"";
+     return '<article class="sales-pipeline-lead">'+
+      '<strong>'+escapeHtml(name)+'</strong>'+
+      '<small>'+escapeHtml(v.company||"")+' · '+escapeHtml(v.email||"")+'</small>'+
+      '<p><strong>Proposed time:</strong> '+escapeHtml(date)+'</p>'+
+      '<small>Timezone: '+escapeHtml(timezone)+'</small>'+
+      '<p><strong>Latest email:</strong> '+escapeHtml(v.latest_email_subject||"No email subject")+'</p>'+
+      email+
+      '<small>Admin approval: '+(v.admin_accepted_at?"Recorded":"Not yet recorded")+
+      ' · Client acceptance: '+(v.prospect_accepted_at?"Recorded":"Not yet recorded")+'</small>'+
+     '</article>';
+    }).join(""):'<div class="sales-empty-state">No meetings in this group.</div>')+
+   '</section>'
+  ).join("");
+
+ }catch(e){
+  count.textContent="Unable to load meeting requests";
+  host.textContent=e.message;
+ }
+}
+
 async function loadUnqualifiedLeads(){
  const count=document.getElementById("unqualifiedLeadCount"),host=document.getElementById("unqualifiedLeadTable");if(!host)return;count.textContent="Loading unqualified leads…";
  try{const r=await fetch("/api/sales/unqualified-leads",{credentials:"same-origin",cache:"no-store"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load unqualified leads.");const rows=d.unqualified_leads||[];count.textContent=rows.length+" unqualified lead"+(rows.length===1?"":"s");
@@ -102,7 +156,41 @@ document.getElementById("functionDetailContent").addEventListener("submit",async
  if(e.target.id!=="salesIcpForm")return;e.preventDefault();const form=e.target,b=form.querySelector('button[type="submit"]'),s=document.getElementById("salesIcpStatus");b.disabled=true;s.textContent="Saving…";
  try{const r=await fetch("/api/sales/qualification-profile",{method:"PUT",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({criteria:Object.fromEntries(new FormData(form).entries())})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save profile.");s.textContent="Saved · Profile version "+d.profile.version;}catch(err){s.textContent=err.message;}finally{b.disabled=false;}
 });
-document.getElementById("functionDetailContent").addEventListener("click",async e=>{
+document.getElementById("functionDetailContent").addEventListener("click",async e=>{ const historyButton=e.target.closest(".sales-email-history-button");
+ if(historyButton){
+  const panel=historyButton.nextElementSibling;
+  const leadId=historyButton.dataset.leadId;
+  if(panel.hidden){
+   panel.hidden=false;
+   panel.innerHTML="Loading email history…";
+   historyButton.disabled=true;
+   try{
+    const response=await fetch("/api/sales/email-history?lead_id="+encodeURIComponent(leadId),{credentials:"same-origin",cache:"no-store"});
+    const data=await response.json();
+    if(!response.ok)throw new Error(data.error||"Could not load email history.");
+    const messages=data.messages||[];
+    const activities=(data.activities||[]).filter(a=>a.activity_type==="sales_email_reply_received");
+    const analyses=new Map();
+    activities.forEach(a=>{
+     try{
+      const details=JSON.parse(a.details_json||"{}");
+      analyses.set(details.gmail_message_id,details);
+     }catch{}
+    });
+    panel.innerHTML=messages.length?messages.map(m=>{
+     const analysis=analyses.get(m.gmail_message_id)||{};
+     return '<div class="sales-email-entry"><strong>'+escapeHtml(m.direction==="inbound"?"Incoming email":"Outgoing email")+'</strong><small>'+escapeHtml(m.received_at||m.created_at||"")+'</small><p><strong>From:</strong> '+escapeHtml(m.sender_email||"")+'</p><p><strong>Subject:</strong> '+escapeHtml(m.subject||"(No subject)")+'</p><p>'+escapeHtml(m.body_text||"")+'</p>'+(analysis.summary?'<p><strong>AI summary:</strong> '+escapeHtml(analysis.summary)+'</p>':"")+(analysis.key_points?.length?'<p><strong>Key points:</strong> '+escapeHtml(analysis.key_points.join(" · "))+'</p>':"")+(analysis.suggested_reply?'<p><strong>Suggested reply (draft only):</strong><br>'+escapeHtml(analysis.suggested_reply)+'</p>':"")+'</div>';
+    }).join(""):'<p>No emails recorded for this lead yet.</p>';
+   }catch(error){
+    panel.textContent=error.message;
+   }finally{
+    historyButton.disabled=false;
+   }
+  }else{
+   panel.hidden=true;
+  }
+  return;
+ }
  if(e.target.closest("#selectAllQualifiedLeads")){
   const master=document.getElementById("selectAllQualifiedLeads"),checks=[...document.querySelectorAll(".qualified-lead-select")];checks.forEach(box=>box.checked=master.checked);
   const selected=checks.filter(box=>box.checked).length,button=document.getElementById("contactQualifiedLeads");if(button){button.disabled=selected===0;button.textContent="Contact Selected Leads ("+selected+") ✉";}
@@ -220,4 +308,3 @@ async function loadQualifiedLeads(){
   const bulk=document.getElementById("contactQualifiedLeads");if(bulk){bulk.disabled=!rows.length;bulk.textContent="Contact Selected Leads (0) ✉";}
  }catch(e){count.textContent="Unable to load qualified leads";host.textContent=e.message;}
 }
-
