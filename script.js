@@ -291,18 +291,21 @@ async function createAssessmentPdf(report,isBusiness) {
   const p1=addPage('Assessment overview',1);
   drawText(p1,'YOUR PERSONALised REPORT'.toUpperCase(),LEFT,100,8,bold,teal);
   addField(p1,'report_title',title,LEFT,118,CONTENT,48,{fontSize:16,bold:true,maxLength:180});
-  addLabel(p1,'Prepared for',LEFT,184);
-  addField(p1,'client_name',company,LEFT,196,CONTENT,28,{fontSize:10,bold:true,maxLength:100});
-  addLabel(p1,'Industry / sector',LEFT,238);
-  addField(p1,'industry',industry,LEFT,250,CONTENT,27,{maxLength:100});
   if(isBusiness){
+    addLabel(p1,'Prepared for',LEFT,184);
+    addField(p1,'client_name',company,LEFT,196,CONTENT,28,{fontSize:10,bold:true,maxLength:100});
+    addLabel(p1,'Industry / sector',LEFT,238);
+    addField(p1,'industry',industry,LEFT,250,CONTENT,27,{maxLength:100});
     addLabel(p1,'Team size',LEFT,292); addField(p1,'team_size',team,LEFT,304,CONTENT,27,{maxLength:70});
     addLabel(p1,'Primary business goal',LEFT,346); addField(p1,'business_goal',goal,LEFT,358,CONTENT,42,{maxLength:180});
+    heading(p1,'Executive summary',425);
   } else {
-    addLabel(p1,'Business stage',LEFT,292); addField(p1,'business_stage',answers.stage||'Not provided',LEFT,304,CONTENT,27,{maxLength:100});
-    addLabel(p1,'Expected customer',LEFT,346); addField(p1,'target_customer',answers.customer||'Not provided',LEFT,358,CONTENT,42,{maxLength:150});
+    addLabel(p1,'Industry / sector',LEFT,184);
+    addField(p1,'industry',industry,LEFT,196,CONTENT,27,{maxLength:100});
+    addLabel(p1,'Business stage',LEFT,238); addField(p1,'business_stage',answers.stage||'Not provided',LEFT,250,CONTENT,27,{maxLength:100});
+    addLabel(p1,'Expected customer',LEFT,292); addField(p1,'target_customer',answers.customer||'Not provided',LEFT,304,CONTENT,42,{maxLength:150});
+    heading(p1,'Executive summary',375);
   }
-  heading(p1,'Executive summary',425);
   const executiveSummary = isBusiness
     ? (()=>{const requested=report.requestedFunctions||[];const recommended=report.recommendedFunctions||[];const focus=recommended.length?recommended.slice(0,3).join(', '):'mapping the highest-friction manual workflow';return 'This assessment reviewed '+industry.toLowerCase()+' operations for a team of '+team.toLowerCase()+', with the stated goal of '+goal.toLowerCase()+'. '+(requested.length?'You asked us to consider '+requested.length+' function(s): '+requested.join(', ')+'. ':'You did not select a specific function to automate. ')+(recommended.length?'The answers indicate that the strongest areas to investigate are '+focus+'. ':'There is not yet enough evidence to recommend a paid automation package. ')+'These are preliminary, rules-based recommendations and must be validated against your actual workflows, systems and costs.';})()
     : (()=>{const priorities=report.priorities||[];return 'Your idea is: '+safePdfText(answers.idea||'Not provided',180)+'. You are currently at the '+(answers.stage||'early planning')+' stage, aiming to serve '+(answers.customer||'a customer group still to be defined').toLowerCase()+'. '+(priorities.length?'The first priorities identified are '+priorities.slice(0,3).map(x=>x.title).join(', ')+'. ':'The next step is to clarify the customer problem and test demand. ')+'Use the roadmap to reduce uncertainty, validate assumptions and build in stages before committing significant resources.';})();
@@ -430,17 +433,23 @@ async function createAssessmentPdf(report,isBusiness) {
     const founderSetup=founderCount*200;
     const founderMonthly=founderCount*20;
     const founderBundle=founderCount>=5;
-    heading(p4,'Assessment approach',100);
-    addField(p4,'founder_methodology',methodology,LEFT,133,CONTENT,65,{fontSize:8,maxLength:500});
-    heading(p4,'Important assessment notes',218);
-    addField(p4,'founder_disclaimer',report.disclaimer||'This is an initial planning report, not professional advice.',LEFT,251,CONTENT,70,{fontSize:8,maxLength:500});
-    heading(p4,'Recommended Donninger.AI products',340);
+    const productDescriptions={
+      'Sales & lead generation':'Lead capture, qualification and follow-up.',
+      'Marketing':'Campaign planning, content and marketing performance.',
+      'Customer service':'Customer enquiries, support requests and response workflows.',
+      'Human resources & recruitment':'Recruitment coordination and routine people processes.',
+      'Finance & accounting':'Invoice, expense and finance administration workflows.',
+      'Operations & administration':'Everyday tasks, records, approvals and administration.',
+      'Stock, suppliers & logistics':'Stock, order and supplier coordination.',
+      'Management & reporting':'Business performance measures and management reporting.'
+    };
+    heading(p4,'Products selected for your business idea',100);
     const founderProductText=founderProducts.length
-      ? founderProducts.map((name,i)=>(i+1)+'. '+name+' — $200 one-time setup + $20/month').join('\n')
-      : 'No paid product package is recommended from the information supplied. We suggest a short workflow-discovery discussion before selecting products.';
-    addField(p4,'founder_recommended_products',founderProductText,LEFT,373,CONTENT,135,{fontSize:8.5,maxLength:1100});
-    heading(p4,'Your package options',526);
-    const packageTop=559;
+      ? founderProducts.map((name,i)=>(i+1)+'. '+name+'\n'+(productDescriptions[name]||'A tailored workflow package based on the needs identified in your assessment.')+'\n$200 one-time setup + $20/month').join('\n\n')
+      : 'No paid product is recommended from the answers supplied. We suggest clarifying your first customer, workflow and operating priorities before selecting a package.';
+    addField(p4,'founder_recommended_products',founderProductText,LEFT,133,CONTENT,235,{fontSize:8,maxLength:1800});
+    heading(p4,'Package price comparison',388);
+    const packageTop=421;
     rect(p4,LEFT,packageTop,CONTENT,27,ink,ink);
     [['PACKAGE',LEFT+7],['SETUP',LEFT+255],['MONTHLY',LEFT+330],['FIRST YEAR',LEFT+415]].forEach(([label,x])=>p4.drawText(pdfWinAnsiText(label),{x,y:H-packageTop-18,size:7,font:bold,color:white}));
     const founderRows=[
@@ -453,14 +462,15 @@ async function createAssessmentPdf(report,isBusiness) {
       p4.drawText(pdfWinAnsiText(row[0]),{x:LEFT+7,y:H-top-19,size:7,font:bold,color:ink});
       row.slice(1).forEach((value,j)=>p4.drawText(pdfWinAnsiText(value),{x:[LEFT+255,LEFT+330,LEFT+415][j],y:H-top-19,size:7,font:regular,color:ink}));
     });
-    heading(p4,'Our recommendation',654);
+    heading(p4,'Recommended package',520);
     const founderRecommendation=founderCount===0
       ? 'No paid package is recommended yet. Confirm the business model and first operational needs before investing.'
       : founderBundle
-        ? 'The complete eight-function platform is the stronger-value option at $1,000 setup + $100/month and includes all eight functions.'
-        : 'Start with the focused products listed above at $'+founderSetup.toLocaleString()+' setup + $'+founderMonthly+'/month. You can add functions as the business grows.';
-    addField(p4,'founder_package_recommendation',founderRecommendation,LEFT,687,CONTENT,48,{fontSize:8,maxLength:350});
-    drawText(p4,'Monthly fees include maintenance and support. Third-party subscriptions, messaging and usage-based AI/API charges are separate. Final scope and integrations are agreed before work begins.',LEFT,754,6.5,regular,muted);
+        ? 'The complete eight-function platform is the stronger-value option at $1,000 setup + $100/month. It includes all eight functions, not only the products listed above.'
+        : 'Based on the products selected above, start with the focused package at $'+founderSetup.toLocaleString()+' setup + $'+founderMonthly+'/month. You can add other functions as the business grows.';
+    addField(p4,'founder_package_recommendation',founderRecommendation,LEFT,553,CONTENT,55,{fontSize:8,maxLength:400});
+    heading(p4,'Pricing terms & important notes',625);
+    addField(p4,'founder_pricing_terms','Individual functions are $200 one-time setup + $20/month. The complete eight-function bundle is $1,000 setup + $100/month. Monthly fees include maintenance and support. Third-party subscriptions, messaging and usage-based AI/API costs are separate. Final scope and integrations are agreed before work begins. This is an initial, rules-based assessment; it does not guarantee business results.',LEFT,658,CONTENT,105,{fontSize:7.2,maxLength:850});
   }
   // Rasterise every finished page into a new image-only PDF, removing editable text objects and form fields.
   const sourceBytes=await pdf.save();
