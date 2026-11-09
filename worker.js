@@ -410,6 +410,121 @@ async function handleUnqualifiedLeads(request,env){
  return json({unqualified_leads:rows.results||[]});
 }
 
+
+function meetingHtmlEscape(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
+}
+async function meetingToken() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return bytesToBase64Url(bytes);
+}
+async function meetingTokenHash(token) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return [...new Uint8Array(digest)].map(v => v.toString(16).padStart(2,"0")).join("");
+}
+async function sendMeetingEmail(env, payload) {
+  if (!env.DONNINGER_EMAIL_TOKEN) throw new Error("Email service is not configured.");
+  const upstream = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+    method:"POST", headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({token:env.DONNINGER_EMAIL_TOKEN,...payload}), redirect:"follow"
+  });
+  const raw = await upstream.text();
+  let result; try { result=JSON.parse(raw); } catch {}
+  if (!upstream.ok || !result || result.success !== true) throw new Error(result?.message || "Meeting email service did not confirm delivery.");
+  return result;
+}
+async function handleAdminMeetingDecision(request, env) {
+  const auth=await requireAdmin(request,env); if(auth.error)return auth.error;
+  if(request.method!=="POST")return json({error:"Method not allowed."},405,{allow:"POST"});
+  let body; try{body=await request.json();}catch{return json({error:"Invalid request."},400);}
+  const id=String(body.appointment_id||"").trim();
+  const decision=String(body.decision||"").trim();
+  if(!id||!["accept","decline"].includes(decision))return json({error:"Choose an appointment and a valid decision."},400);
+  const org="dev-donninger";
+  const appointment=await env.DB.prepare("SELECT a.*,l.first_name,l.last_name,l.email,l.company FROM sales_appointments a JOIN leads l ON l.id=a.lead_id WHERE a.id=? AND a.organisation_id=?").bind(id,org).first();
+  if(!appointment)return json({error:"Meeting request not found."},404);
+  if(appointment.status!=="requested")return json({error:"This meeting request is no longer awaiting a decision."},409);
+  if(decision==="decline"){
+    if(appointment.admin_accepted_at)return json({error:"The administrator has already accepted this time. Use the client confirmation workflow instead."},409);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE sales_appointments SET status='cancelled',admin_declined_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=? AND status='requested'").bind(id,org),
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_admin_declined',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,requested_start_at:appointment.requested_start_at}),auth.session.email)
+    ]);
+    return json({success:true,status:"cancelled",message:"Meeting request declined."});
+  }
+  if(appointment.admin_accepted_at)return json({error:"Administrator approval has already been recorded."},409);
+  if(!appointment.email||!appointment.requested_start_at)return json({error:"The prospect email or proposed meeting time is missing."},400);
+  const accept=await meetingToken(), decline=await meetingToken();
+  const expires=new Date(Date.now()+7*24*60*60*1000).toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE sales_appointments SET admin_accepted_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NULL").bind(id,org),
+    env.DB.prepare("INSERT INTO sales_appointment_tokens (id,organisation_id,appointment_id,token_hash,purpose,expires_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),org,id,await meetingTokenHash(accept),"client_accept",expires),
+    env.DB.prepare("INSERT INTO sales_appointment_tokens (id,organisation_id,appointment_id,token_hash,purpose,expires_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),org,id,await meetingTokenHash(decline),"client_decline",expires),
+    env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_admin_accepted',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,requested_start_at:appointment.requested_start_at}),auth.session.email)
+  ]);
+  const origin=new URL(request.url).origin;
+  try {
+    await sendMeetingEmail(env,{
+      action:"send_meeting_confirmation_email",
+      email:appointment.email,
+      firstName:appointment.first_name,
+      meetingTime:appointment.requested_start_at,
+      timezone:appointment.prospect_timezone||appointment.timezone||"Asia/Jerusalem",
+      acceptUrl:origin+"/meeting/respond?token="+encodeURIComponent(accept),
+      declineUrl:origin+"/meeting/respond?token="+encodeURIComponent(decline)
+    });
+    await env.DB.prepare("UPDATE sales_appointments SET confirmation_email_sent_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?").bind(id,org).run();
+    return json({success:true,status:"awaiting_client",message:"Administrator approval recorded and client confirmation email sent."});
+  } catch(error) {
+    console.error("Meeting confirmation email failed:",error);
+    return json({success:true,status:"awaiting_client",email_sent:false,error:"Approval was recorded, but the client email could not be sent: "+String(error.message||error).slice(0,220)});
+  }
+}
+async function handleClientMeetingResponse(request,env) {
+  const url=new URL(request.url);
+  if(request.method==="GET"){
+    const token=String(url.searchParams.get("token")||"");
+    if(!/^[A-Za-z0-9_-]{40,60}$/.test(token))return new Response("Invalid or expired meeting link.",{status:400,headers:{"content-type":"text/plain; charset=utf-8"}});
+    const hash=await meetingTokenHash(token);
+    const record=await env.DB.prepare("SELECT t.purpose,t.expires_at,t.used_at,a.status,a.requested_start_at,a.timezone,a.prospect_timezone,l.first_name FROM sales_appointment_tokens t JOIN sales_appointments a ON a.id=t.appointment_id JOIN leads l ON l.id=a.lead_id WHERE t.token_hash=? AND t.organisation_id=?").bind(hash,"dev-donninger").first();
+    if(!record||record.used_at||record.expires_at<=new Date().toISOString()||record.status!=="requested")return new Response("This meeting response link has expired or has already been used.",{status:410,headers:{"content-type":"text/plain; charset=utf-8"}});
+    const decision=record.purpose==="client_accept"?"accept":"decline";
+    const label=decision==="accept"?"Confirm this meeting":"Decline this meeting";
+    const time=new Date(record.requested_start_at).toLocaleString("en-US",{dateStyle:"full",timeStyle:"short",timeZone:record.prospect_timezone||record.timezone||"Asia/Jerusalem"});
+    const html='<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Meeting response · Donninger.AI</title><body style="font-family:Arial,sans-serif;background:#f5f7fb;padding:32px;color:#172033"><main style="max-width:520px;margin:5vh auto;background:white;padding:32px;border-radius:16px"><p style="color:#64748b;font-weight:bold">DONNINGER.AI</p><h1>Meeting response</h1><p>Hello '+meetingHtmlEscape(record.first_name)+',</p><p>Please review the proposed meeting time before confirming.</p><p><strong>'+meetingHtmlEscape(time)+'</strong><br>'+meetingHtmlEscape(record.prospect_timezone||record.timezone||"")+'</p><form method="post" action="/meeting/respond"><input type="hidden" name="token" value="'+meetingHtmlEscape(token)+'"><input type="hidden" name="decision" value="'+decision+'"><button style="background:#172033;color:white;border:0;padding:14px 22px;border-radius:8px;font-size:16px;cursor:pointer">'+label+'</button></form><p style="color:#64748b;font-size:13px">Nothing changes until you press the button above. This secure link can only be used once.</p></main></body></html>';
+    return new Response(html,{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store","x-content-type-options":"nosniff"}});
+  }
+  if(request.method==="POST"){
+    let form;try{form=await request.formData();}catch{return new Response("Invalid response.",{status:400});}
+    const token=String(form.get("token")||"");
+    const decision=String(form.get("decision")||"");
+    if(!/^[A-Za-z0-9_-]{40,60}$/.test(token)||!["accept","decline"].includes(decision))return new Response("Invalid response.",{status:400});
+    const hash=await meetingTokenHash(token);
+    const purpose=decision==="accept"?"client_accept":"client_decline";
+    const record=await env.DB.prepare("SELECT t.id AS token_id,t.appointment_id,a.lead_id,a.status,a.admin_accepted_at FROM sales_appointment_tokens t JOIN sales_appointments a ON a.id=t.appointment_id WHERE t.token_hash=? AND t.organisation_id=? AND t.purpose=? AND t.used_at IS NULL AND t.expires_at>?").bind(hash,"dev-donninger",purpose,new Date().toISOString()).first();
+    if(!record||record.status!=="requested")return new Response("This meeting response link has expired or has already been used.",{status:410});
+    const now=new Date().toISOString();
+    if(decision==="accept"&&!record.admin_accepted_at)return new Response("The administrator has not approved this meeting time yet.",{status:409});
+    if(decision==="accept"){
+      await env.DB.batch([
+        env.DB.prepare("UPDATE sales_appointment_tokens SET used_at=? WHERE id=? AND used_at IS NULL").bind(now,record.token_id),
+        env.DB.prepare("UPDATE sales_appointments SET prospect_accepted_at=?,status='confirmed',confirmed_start_at=requested_start_at,updated_at=? WHERE id=? AND status='requested' AND admin_accepted_at IS NOT NULL").bind(now,now,record.appointment_id),
+        env.DB.prepare("UPDATE leads SET pipeline_stage='meeting_confirmed',status='proposal',updated_at=? WHERE id=? AND organisation_id=?").bind(now,record.lead_id,"dev-donninger"),
+        env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_client_accepted',?,?)").bind(crypto.randomUUID(),"dev-donninger",record.lead_id,JSON.stringify({appointment_id:record.appointment_id}),"Client")
+      ]);
+    } else {
+      await env.DB.batch([
+        env.DB.prepare("UPDATE sales_appointment_tokens SET used_at=? WHERE id=? AND used_at IS NULL").bind(now,record.token_id),
+        env.DB.prepare("UPDATE sales_appointments SET status='cancelled',client_declined_at=?,updated_at=? WHERE id=? AND status='requested'").bind(now,now,record.appointment_id),
+        env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_client_declined',?,?)").bind(crypto.randomUUID(),"dev-donninger",record.lead_id,JSON.stringify({appointment_id:record.appointment_id}),"Client")
+      ]);
+    }
+    const message=decision==="accept"?"Thank you. Your meeting is confirmed.":"Your response has been recorded. The meeting request has been declined.";
+    return new Response('<!doctype html><html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><body style="font-family:Arial,sans-serif;background:#f5f7fb;padding:32px;color:#172033"><main style="max-width:520px;margin:5vh auto;background:white;padding:32px;border-radius:16px"><strong>DONNINGER.AI</strong><h1>Response recorded</h1><p>'+message+'</p></main></body></html>',{headers:{"content-type":"text/html; charset=utf-8","cache-control":"no-store"}});
+  }
+  return new Response("Method not allowed.",{status:405,headers:{allow:"GET, POST"}});
+}
+
 async function handleSalesAppointments(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
@@ -742,6 +857,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/qualify-batch") return handleBulkLeadQualification(request, env);
   if (url.pathname === "/api/sales/qualified-leads") return handleQualifiedLeads(request, env);
   if (url.pathname === "/api/sales/unqualified-leads") return handleUnqualifiedLeads(request, env);
+  if (url.pathname === "/api/sales/appointments/respond") return handleAdminMeetingDecision(request, env);
   if (url.pathname === "/api/sales/appointments") return handleSalesAppointments(request, env);
   if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
   if (url.pathname === "/api/sales/email-history") return handleSalesEmailHistory(request, env);
@@ -774,6 +890,7 @@ async function handleApi(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/meeting/respond") return handleClientMeetingResponse(request, env);
     if (url.pathname.startsWith("/api/")) return handleApi(request, env);
     return env.ASSETS.fetch(request);
   }
