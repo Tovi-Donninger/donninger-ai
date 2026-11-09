@@ -524,12 +524,14 @@ async function handleClientMeetingResponse(request,env) {
     if(!record||record.status!=="requested")return new Response("This meeting response link has expired or has already been used.",{status:410});
     if(!record.admin_accepted_at)return new Response("The administrator has not approved this meeting time yet.",{status:409});
     const now=new Date().toISOString();
-    const tokenUpdate=await env.DB.prepare("UPDATE sales_appointment_tokens SET used_at=? WHERE id=? AND used_at IS NULL AND expires_at>?").bind(now,record.token_id,now).run();
-    if(!tokenUpdate.meta||tokenUpdate.meta.changes!==1)return new Response("This meeting link has already been used.",{status:410});
-    const appointmentUpdate=decision==="accept"
-      ? await env.DB.prepare("UPDATE sales_appointments SET prospect_accepted_at=?,status='confirmed',confirmed_start_at=requested_start_at,updated_at=? WHERE id=? AND status='requested' AND admin_accepted_at IS NOT NULL").bind(now,now,record.appointment_id).run()
-      : await env.DB.prepare("UPDATE sales_appointments SET status='cancelled',client_declined_at=?,updated_at=? WHERE id=? AND status='requested' AND admin_accepted_at IS NOT NULL").bind(now,now,record.appointment_id).run();
-    if(!appointmentUpdate.meta||appointmentUpdate.meta.changes!==1)return new Response("This meeting has already been updated. Please contact Donninger.AI if you need help.",{status:409});
+    const nextStatus=decision==="accept"?"confirmed":"cancelled";
+    const appointmentUpdate=await env.DB.batch([
+      decision==="accept"
+        ? env.DB.prepare("UPDATE sales_appointments SET prospect_accepted_at=?,status='confirmed',confirmed_start_at=requested_start_at,updated_at=? WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NOT NULL AND EXISTS (SELECT 1 FROM sales_appointment_tokens WHERE id=? AND appointment_id=? AND purpose=? AND used_at IS NULL AND expires_at>?)").bind(now,now,record.appointment_id,"dev-donninger",record.token_id,record.appointment_id,purpose,now)
+        : env.DB.prepare("UPDATE sales_appointments SET status='cancelled',client_declined_at=?,updated_at=? WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NOT NULL AND EXISTS (SELECT 1 FROM sales_appointment_tokens WHERE id=? AND appointment_id=? AND purpose=? AND used_at IS NULL AND expires_at>?)").bind(now,now,record.appointment_id,"dev-donninger",record.token_id,record.appointment_id,purpose,now),
+      env.DB.prepare("UPDATE sales_appointment_tokens SET used_at=COALESCE(used_at,?) WHERE appointment_id=? AND organisation_id=? AND used_at IS NULL AND EXISTS (SELECT 1 FROM sales_appointments WHERE id=? AND status=? AND updated_at=?)").bind(now,record.appointment_id,"dev-donninger",record.appointment_id,nextStatus,now)
+    ]);
+    if(!appointmentUpdate[0]?.meta||appointmentUpdate[0].meta.changes!==1)return new Response("This meeting link has already been used or the meeting has changed. Please contact Donninger.AI if you need help.",{status:409});
     const detail=JSON.stringify({appointment_id:record.appointment_id,response:decision});
     const statements=[
       env.DB.prepare("UPDATE sales_appointment_tokens SET used_at=COALESCE(used_at,?) WHERE appointment_id=? AND organisation_id=? AND used_at IS NULL").bind(now,record.appointment_id,"dev-donninger"),
