@@ -272,21 +272,37 @@ async function handleBulkLeadQualification(request,env){
  let body;try{body=await request.json();}catch{return json({error:"Invalid request."},400);}
  const description=String(body.description||"").trim().slice(0,5000);
  if(description.length<20)return json({error:"Please describe what a qualified lead means in at least 20 characters."},400);
- const org="dev-donninger",model=String(env.GEMINI_MODEL||"gemini-3.8-flash").trim();
+ const org="dev-donninger";let model=String(env.GEMINI_MODEL||"gemini-3.5-flash-lite").trim();
  const leadsResult=await env.DB.prepare("SELECT id,first_name,last_name,email,phone,company,job_title,source,customer_need,status FROM leads WHERE organisation_id=? ORDER BY created_at DESC LIMIT 200").bind(org).all();
  const leads=leadsResult.results||[];
  if(!leads.length)return json({error:"There are no imported leads to qualify yet."},400);
  const criteriaSchema={type:"OBJECT",properties:{definition:{type:"STRING"},must_have:{type:"ARRAY",items:{type:"STRING"}},strong_signals:{type:"ARRAY",items:{type:"STRING"}},disqualifiers:{type:"ARRAY",items:{type:"STRING"}},unknown_handling:{type:"STRING"},qualification_threshold:{type:"INTEGER"}},required:["definition","must_have","strong_signals","disqualifiers","unknown_handling","qualification_threshold"]};
  const assessmentSchema={type:"OBJECT",properties:{lead_id:{type:"STRING"},fit_score:{type:"INTEGER"},priority:{type:"STRING",enum:["low","medium","high"]},confidence:{type:"NUMBER"},qualified:{type:"BOOLEAN"},summary:{type:"STRING"},matched_criteria:{type:"ARRAY",items:{type:"STRING"}},gaps:{type:"ARRAY",items:{type:"STRING"}},evidence:{type:"ARRAY",items:{type:"OBJECT",properties:{field:{type:"STRING"},observed:{type:"STRING"},relevance:{type:"STRING"}},required:["field","observed","relevance"]}},recommended_next_action:{type:"STRING"},purchase_intent:{type:"STRING",enum:["explicit","possible","not_stated"]}},required:["lead_id","fit_score","priority","confidence","qualified","summary","matched_criteria","gaps","evidence","recommended_next_action","purchase_intent"]};
  const callGemini=async(prompt,schema,maxTokens=7000)=>{
-  const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(model)+":generateContent?key="+encodeURIComponent(env.GEMINI_API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,temperature:0.1,maxOutputTokens:maxTokens}})});
-  const data=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error("AI provider HTTP "+r.status+": "+String(data.error?.message||"Request failed").slice(0,300));
-  const output=data.candidates?.[0]?.content?.parts?.map(x=>x.text||"").join("")||"";
-  if(!output)throw new Error("The AI returned an empty response. Please retry.");
-  return JSON.parse(output);
+  const models=[...new Set([model,"gemini-3.5-flash-lite","gemini-3.8-flash","gemini-3.5-flash"])];
+  let lastError=null;
+  for(const candidate of models){
+   try{
+    const r=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(candidate)+":generateContent?key="+encodeURIComponent(env.GEMINI_API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,temperature:0.1,maxOutputTokens:maxTokens}})});
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok){
+     const detail=String(data.error?.message||"Request failed").slice(0,260);
+     lastError=new Error("AI provider HTTP "+r.status+" ("+candidate+"): "+detail);
+     if(r.status===503||r.status===502||r.status===500)continue;
+     throw lastError;
+    }
+    const output=data.candidates?.[0]?.content?.parts?.map(x=>x.text||"").join("")||"";
+    if(!output)throw new Error("The AI returned an empty response.");
+    const parsed=JSON.parse(output);model=candidate;return parsed;
+   }catch(error){
+    lastError=error;
+    if(/AI provider HTTP 503|AI provider HTTP 502|AI provider HTTP 500/.test(String(error.message||"")))continue;
+    throw error;
+   }
+  }
+  throw new Error((lastError?.message||"AI models are temporarily unavailable.")+" Tried the configured model and two fallback models. Please retry in a moment.");
  };
- const batchSize=8,qualified=[],notQualified=[],errors=[];
+ const batchSize=4,qualified=[],notQualified=[],errors=[];
  let criteria=null,profileId=null,version=1;
  try{
   for(let offset=0;offset<leads.length;offset+=batchSize){
