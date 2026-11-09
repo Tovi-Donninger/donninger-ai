@@ -885,7 +885,7 @@ async function handleSalesReplyIngest(request, env) {
       const parsedStart = new Date(rawStart);
       try {
         new Intl.DateTimeFormat("en-US", { timeZone: proposedTimezone });
-        if (/[zZ]|[+-]\d{2}:\d{2}$/.test(rawStart) && Number.isFinite(parsedStart.getTime()) && parsedStart.getTime() > Date.now()) {
+        if (/(?:[zZ]|[+-]\d{2}:\d{2})$/.test(rawStart) && Number.isFinite(parsedStart.getTime()) && parsedStart.getTime() > Date.now()) {
           requestedStart = parsedStart.toISOString();
           prospectTimezone = proposedTimezone;
         }
