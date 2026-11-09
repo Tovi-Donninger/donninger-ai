@@ -470,7 +470,9 @@ async function createAssessmentPdf(report,isBusiness) {
       'Management & reporting':'You want strategic direction and growth visibility. This package can bring agreed business measures into recurring reports so you can spot issues and make decisions with clearer information.'
     };
     const founderProductText=founderProducts.length
-      ? founderProducts.map((name,i)=>(i+1)+'. '+name+'\\nWhy it fits: '+(supportReasons[name]||'This function supports an area you identified in the assessment.')+'\\nGoal alignment: build a repeatable process for your '+(answers.stage||'current-stage').toLowerCase()+' business, with room to expand as demand grows. $200 setup + $20/month.').join('\\n\\n')
+      ? founderProducts.map((name,i)=>(i+1)+'. '+name+'\\nWhy it fits: '+(name==='Marketing' && report.marketingRecommendedForSales
+        ? 'Recommended as the lead-generation partner to your Sales & Lead Generation function. Marketing helps attract and capture suitable prospects through agreed campaigns and channels, giving Sales opportunities to qualify and convert.'
+        : (supportReasons[name]||'This function supports an area you identified in the assessment.'))+'\\nGoal alignment: build a repeatable process for your '+(answers.stage||'current-stage').toLowerCase()+' business, with room to expand as demand grows. $200 setup + $20/month.').join('\\n\\n')
       : 'No paid product is recommended from the answers supplied. We suggest clarifying your first customer, workflow and operating priorities before selecting a package.';
     addField(p4,'founder_recommended_products',founderProductText,LEFT,133,CONTENT,235,{fontSize:8,maxLength:1800});
     heading(p4,'Package price comparison',388);
@@ -769,9 +771,12 @@ function renderFinalRecommendations(report,isBusiness) {
   if (!selected.length) {
     return '<section class="report-section report-final"><h3>Donninger.AI product recommendations</h3><p class="report-chart-intro">Your answers do not yet identify a clear need for one of our eight automation products. We recommend clarifying your first customer, workflow and operating priorities before purchasing. You can revisit this assessment as your plan develops.</p></section>';
   }
-  const rows = selected.map(([id,name,description]) =>
-    '<tr><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(description)+'</small></td><td>$200</td><td>$20</td><td><a class="button report-explore-link" href="automation.html?function='+id+'">View product</a> <button type="button" class="button cart-add-button" data-cart-add="'+id+'">Add to cart</button></td></tr>'
-  ).join('');
+  const rows = selected.map(([id,name,description]) => {
+    const productDescription = id==='marketing' && recommended.includes('Sales & lead generation')
+      ? 'Recommended alongside Sales & Lead Generation to attract and capture prospects for the sales pipeline.'
+      : description;
+    return '<tr><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(productDescription)+'</small></td><td>$200</td><td>$20</td><td><a class="button report-explore-link" href="automation.html?function='+id+'">View product</a> <button type="button" class="button cart-add-button" data-cart-add="'+id+'">Add to cart</button></td></tr>';
+  }).join('');
   const count = selected.length;
   const bundleRecommended = count >= 5;
   const focusedSetup=count*200, focusedMonthly=count*20;
@@ -807,8 +812,16 @@ function buildBusinessReport() {
     if (answers.goal==='Not sure — show me the biggest opportunities') add('Operations & administration');
     else requested.slice(0,2).forEach(add);
   }
+  // Sales needs a dependable source of prospects, so Marketing is recommended
+  // as its complementary lead-generation function whenever Sales is recommended.
+  if (recommended.has('Sales & lead generation')) add('Marketing');
   const recommendedFunctions=[...recommended];
-  const recommendations=recommendedFunctions.map(name=>({title:name,body:functionDetails[name]?.task || 'Review this function’s recurring workflows, tools and approval requirements.'}));
+  const recommendations=recommendedFunctions.map(name=>({
+    title:name,
+    body:name==='Marketing' && recommended.has('Sales & lead generation')
+      ? 'Recommended alongside Sales & Lead Generation because a sales pipeline needs a consistent source of prospects. Marketing can plan campaigns, prepare content, capture enquiries and attribute leads to their sources; the sales function can then qualify and convert those opportunities.'
+      : functionDetails[name]?.task || 'Review this function’s recurring workflows, tools and approval requirements.'
+  }));
   if (!recommendations.length) recommendations.push({title:'Map the highest-volume manual process',body:'Choose one recurring task, document its current steps and measure how often it happens before selecting an automation.'});
   const goalMap={
     'Win more customers and respond faster':'Start with enquiry capture, lead qualification and follow-up speed.',
@@ -907,6 +920,7 @@ function buildFounderReport() {
     highlightNote:resourceText,
     priorities:priorities.slice(0,4),
     recommendedFunctions:[...recommendedSet],
+    marketingRecommendedForSales:recommendedSet.has('Sales & lead generation') && !support.includes('Marketing and finding customers'),
     steps:['Write down the customer problem and the specific outcome your offer will deliver.','Validate demand through conversations, competitor research and a small real-world test.','Create a lean budget and a simple plan for making the first sale.','Use AI and automation to support repeatable tasks, while keeping important customer and financial decisions under human control.'],
     disclaimer:'This is an initial, rules-based planning report, not legal, tax, investment or financial advice. Requirements vary by country and industry. Validate assumptions with customers and qualified local professionals before making major commitments.'
   };
