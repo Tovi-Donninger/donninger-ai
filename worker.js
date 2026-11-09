@@ -113,7 +113,7 @@ async function handleSalesLeads(request, env) {
   const organisationId = "dev-donninger";
   if (request.method === "GET") {
     const result = await env.DB.prepare(
-      "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, created_at, updated_at FROM leads WHERE organisation_id = ? ORDER BY created_at DESC LIMIT 200"
+      "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, created_at, updated_at FROM leads WHERE organisation_id = ? AND status = 'new' ORDER BY created_at DESC LIMIT 200"
     ).bind(organisationId).all();
     return json({ leads: result.results || [] });
   }
@@ -374,9 +374,13 @@ async function handleBulkLeadQualification(request,env){
       statements.push(env.DB.prepare("INSERT INTO sales_qualification_runs (id,organisation_id,lead_id,profile_id,profile_version,status,priority,fit_score,confidence,result_json,evidence_json,model_name,prompt_version,completed_at) VALUES (?,?,?,?,?,'completed',?,?,?,?,?,?,'bulk-qualification-v2',strftime('%Y-%m-%dT%H:%M:%fZ','now'))").bind(runId,org,lead.id,profileId,version,result.priority,result.fit_score,result.confidence,JSON.stringify(result),JSON.stringify(evidence),model));
       if(result.qualified){
        statements.push(env.DB.prepare("INSERT INTO qualified_leads (id,organisation_id,lead_id,qualification_run_id,fit_score,priority,qualification_summary,qualification_json) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(organisation_id,lead_id) DO UPDATE SET qualification_run_id=excluded.qualification_run_id,fit_score=excluded.fit_score,priority=excluded.priority,qualification_summary=excluded.qualification_summary,qualification_json=excluded.qualification_json,qualified_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(crypto.randomUUID(),org,lead.id,runId,result.fit_score,result.priority,result.summary||"",JSON.stringify(result)));
+       statements.push(env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
+       statements.push(env.DB.prepare("UPDATE leads SET status='qualified',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
        qualified.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,priority:result.priority,summary:result.summary||"",result});
       }else{
        statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
+       statements.push(env.DB.prepare("INSERT INTO unqualified_leads (id,organisation_id,lead_id,qualification_run_id,fit_score,qualification_summary,qualification_json) VALUES (?,?,?,?,?,?,?) ON CONFLICT(organisation_id,lead_id) DO UPDATE SET qualification_run_id=excluded.qualification_run_id,fit_score=excluded.fit_score,qualification_summary=excluded.qualification_summary,qualification_json=excluded.qualification_json,assessed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(crypto.randomUUID(),org,lead.id,runId,result.fit_score,result.summary||"",JSON.stringify(result)));
+       statements.push(env.DB.prepare("UPDATE leads SET status='lost',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
        notQualified.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,summary:result.summary||"",gaps:result.gaps||[],matched_criteria:result.matched_criteria||[]});
       }
      }
@@ -399,8 +403,12 @@ async function handleQualifiedLeads(request,env){
  const rows=await env.DB.prepare("SELECT q.lead_id,q.fit_score,q.priority,q.qualification_summary,q.qualification_json,q.qualified_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? ORDER BY q.fit_score DESC,q.qualified_at DESC LIMIT 200").bind("dev-donninger").all();
  return json({qualified_leads:rows.results||[]});
 }
-
-
+async function handleUnqualifiedLeads(request,env){
+ const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
+ if(request.method!=="GET")return json({error:"Method not allowed."},405);
+ const rows=await env.DB.prepare("SELECT u.lead_id,u.fit_score,u.qualification_summary,u.qualification_json,u.assessed_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM unqualified_leads u JOIN leads l ON l.id=u.lead_id WHERE u.organisation_id=? ORDER BY u.assessed_at DESC LIMIT 200").bind("dev-donninger").all();
+ return json({unqualified_leads:rows.results||[]});
+}
 async function handleSalesContactTestLead(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
@@ -508,6 +516,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/qualifications/review") return reviewLeadQualification(request, env);
   if (url.pathname === "/api/sales/qualify-batch") return handleBulkLeadQualification(request, env);
   if (url.pathname === "/api/sales/qualified-leads") return handleQualifiedLeads(request, env);
+  if (url.pathname === "/api/sales/unqualified-leads") return handleUnqualifiedLeads(request, env);
   if (url.pathname === "/api/sales/contact-test-lead") return handleSalesContactTestLead(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     if (!env.DEV_ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Development authentication is not configured. Add the required Worker secrets in Cloudflare." }, 503);
