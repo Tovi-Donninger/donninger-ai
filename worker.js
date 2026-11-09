@@ -586,6 +586,7 @@ async function handleSalesAppointments(request, env) {
       a.duration_minutes,
       a.timezone,
       a.prospect_timezone,
+      a.discussion_summary,
       a.prospect_accepted_at,
       a.admin_accepted_at,
       a.confirmation_email_sent_at,
@@ -877,18 +878,19 @@ async function handleSalesReplyIngest(request, env) {
       const parsedStart = new Date(rawStart);
       try {
         new Intl.DateTimeFormat("en-US", { timeZone: proposedTimezone });
-        if (Number.isFinite(parsedStart.getTime()) && parsedStart.getTime() > Date.now()) {
+        if (/[zZ]|[+-]\\d{2}:\\d{2}$/.test(rawStart) && Number.isFinite(parsedStart.getTime()) && parsedStart.getTime() > Date.now()) {
           requestedStart = parsedStart.toISOString();
           prospectTimezone = proposedTimezone;
         }
       } catch {}
     }
     const meetingSummary = proposedText || summary;
-    const activeAppointment = await env.DB.prepare("SELECT id,requested_start_at,prospect_timezone FROM sales_appointments WHERE organisation_id=? AND lead_id=? AND status='requested' ORDER BY created_at DESC LIMIT 1").bind(org,lead.id).first();
+    const activeAppointment = await env.DB.prepare("SELECT id,requested_start_at,prospect_timezone,discussion_summary FROM sales_appointments WHERE organisation_id=? AND lead_id=? AND status='requested' ORDER BY created_at DESC LIMIT 1").bind(org,lead.id).first();
     const now = new Date().toISOString();
     if (activeAppointment) {
       const sameProposal = (activeAppointment.requested_start_at || "") === (requestedStart || "") &&
-        (activeAppointment.prospect_timezone || "") === prospectTimezone;
+        (activeAppointment.prospect_timezone || "") === prospectTimezone &&
+        (requestedStart || (activeAppointment.discussion_summary || "") === meetingSummary);
       if (!sameProposal) {
         statements.push(
           env.DB.prepare("UPDATE sales_appointments SET requested_start_at=?,confirmed_start_at=NULL,duration_minutes=?,timezone='Asia/Jerusalem',prospect_timezone=?,prospect_accepted_at=NULL,admin_accepted_at=NULL,admin_declined_at=NULL,client_declined_at=NULL,confirmation_email_sent_at=NULL,discussion_summary=?,updated_at=? WHERE id=? AND organisation_id=? AND status='requested'")
