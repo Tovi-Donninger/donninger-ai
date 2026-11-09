@@ -530,7 +530,7 @@ function renderReport() {
     '<p class="assessment-intro">'+escapeHtml(report.summary)+'</p>';
   const businessSections = isBusiness
     ? renderBusinessComparison(report)+renderBusinessPricing(report)
-    : renderFounderSections(report);
+    : renderFounderSections(report)+renderFinalRecommendations(report,false);
   modalContent.innerHTML = intro+businessSections+
     '<section class="report-section report-notes"><h3>Important assessment notes</h3><p class="report-disclaimer">'+escapeHtml(report.disclaimer)+'</p></section>'+
     renderDownloadReportSection()+
