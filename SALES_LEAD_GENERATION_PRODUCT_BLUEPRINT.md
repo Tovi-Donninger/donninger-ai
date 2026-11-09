@@ -121,8 +121,10 @@ Interest tracking is separate from pipeline stage and may include: unknown, no r
 10. Harden production authentication, tenant isolation, role permissions, audit, privacy and retention before real client data or customer self-service.
 
 ## Current implementation status
-- Migration 0001: organisations, leads, sales tasks and activity tables (committed; not yet applied to D1).
-- Migration 0002: campaigns, import batches, staged rows and marketing handover fields (committed; not yet applied to D1).
-- Migration 0003: tenant ICP profiles, AI qualification run history, outbound/inbound message records, contact events, reply analyses and channel preferences (committed; not yet applied to D1).
-- CSV/XLSX import UI/API, live qualification calls, messaging provider connections, reply webhooks and live portal workflows are not yet implemented.
+- Migrations 0001–0003 are committed and were manually executed successfully in the development D1 database.
+- CSV lead import, preview and lead-record listing are implemented and have been tested with six fictional sample leads. Current importer supports CSV; XLSX and advanced duplicate-review/import history remain future work.
+- The first AI qualification release is now implemented in the Worker and portal: versioned organisation ICP profile, one-lead-at-a-time Gemini qualification, structured fit score/priority/confidence, evidence, gaps, purchase-intent classification, recommended next action, D1 run history and human review decisions.
+- AI qualification requires the `GEMINI_API_KEY` Worker secret. The default model is `gemini-3.8-flash`; `GEMINI_MODEL` can override it. The API key must remain server-side.
+- AI qualification and profile endpoints are implemented but still require deployment and a live test with the configured Gemini API key. Do not treat the feature as verified until that test succeeds.
+- Messaging provider connections, reply webhooks, XLSX import, duplicate-review workflow and production multi-tenant security are not yet implemented.
 - Portal authentication remains development-admin-only. Do not enter real customer or sensitive business data.
