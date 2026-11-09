@@ -476,7 +476,7 @@ async function handleAdminMeetingDecision(request, env) {
       env.DB.prepare("INSERT INTO sales_appointment_tokens (id,organisation_id,appointment_id,token_hash,purpose,expires_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),org,id,await meetingTokenHash(accept),"client_accept",expires),
       env.DB.prepare("INSERT INTO sales_appointment_tokens (id,organisation_id,appointment_id,token_hash,purpose,expires_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),org,id,await meetingTokenHash(decline),"client_decline",expires)
     ]);
-    const origin=new URL(request.url).origin;
+    const origin="https://donninger-ai.tovidonninger.workers.dev";
     await sendMeetingEmail(env,{
       action:"send_meeting_confirmation_email",
       email:appointment.email,
