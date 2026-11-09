@@ -144,6 +144,38 @@ async function handleSalesLeads(request, env) {
   }
   return json({ error: "Method not allowed." }, 405, { allow: "GET, POST" });
 }
+async function handleDonningerTestLead(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+  const org = "dev-donninger";
+  const email = "tovidonninger@gmail.com";
+  const existing = await env.DB.prepare("SELECT id, source FROM leads WHERE organisation_id=? AND lower(email)=lower(?) ORDER BY created_at DESC LIMIT 1").bind(org, email).first();
+  if (existing && existing.source !== "donninger_ai_self_test") {
+    return json({ error: "A lead with your email already exists. It was left unchanged; please use that existing record." }, 409);
+  }
+  const details = {
+    first_name: "Tovi", last_name: "Donninger", email,
+    phone: "", company: "Donninger.AI", job_title: "Founder & CEO",
+    source: "donninger_ai_self_test",
+    customer_need: "I am the founder of Donninger.AI and actively operate the business. I want to use our own AI business automation and sales tools to generate more customers, improve sales conversion, automate lead qualification and personalised outreach, and test whether Donninger.AI can use its own sales workflow to win customers.",
+    contact_permission: "consent_given"
+  };
+  let id;
+  if (existing) {
+    id = existing.id;
+    await env.DB.prepare("UPDATE leads SET first_name=?,last_name=?,company=?,job_title=?,source=?,customer_need=?,contact_permission=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?")
+      .bind(details.first_name, details.last_name, details.company, details.job_title, details.source, details.customer_need, details.contact_permission, id, org).run();
+  } else {
+    id = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO leads (id,organisation_id,first_name,last_name,email,phone,company,job_title,source,customer_need,contact_permission) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
+      .bind(id, org, details.first_name, details.last_name, details.email, details.phone, details.company, details.job_title, details.source, details.customer_need, details.contact_permission).run();
+  }
+  await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'lead_created',?,?)")
+    .bind(crypto.randomUUID(), org, id, JSON.stringify({ source: details.source, self_test: true, recipient_authorised_by_user: true }), auth.session.email).run();
+  return json({ success: true, created: !existing, lead: { id, ...details }, message: existing ? "Your Donninger.AI test lead was refreshed." : "Your Donninger.AI test lead was added. Run AI qualification to assess it." }, existing ? 200 : 201);
+}
+
 async function handleSalesLeadImport(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
@@ -372,7 +404,8 @@ async function handleApi(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/api/reports/send") return handleReportSend(request, env);
   if (url.pathname === "/api/sales/leads") return handleSalesLeads(request, env);
-  if (url.pathname === "/api/sales/leads/import") return handleSalesLeadImport(request, env);
+  if (url.pathname === "/api/sales/test-lead") return handleDonningerTestLead(request, env);
+   if (url.pathname === "/api/sales/leads/import") return handleSalesLeadImport(request, env);
   if (url.pathname === "/api/sales/qualification-profile") return handleQualificationProfile(request, env);
   if (url.pathname === "/api/sales/qualifications") return handleLeadQualifications(request, env);
   if (url.pathname === "/api/sales/qualifications/review") return reviewLeadQualification(request, env);
