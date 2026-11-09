@@ -124,6 +124,8 @@ async function loadSalesAppointments(){
       email+
       '<small>Admin approval: '+(v.admin_accepted_at?"Recorded":"Not yet recorded")+
       ' · Client acceptance: '+(v.prospect_accepted_at?"Recorded":"Not yet recorded")+'</small>'+
+      (v.status==="requested"&&!v.admin_accepted_at?'<div class="meeting-approval-actions"><button type="button" class="portal-button portal-button-primary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="accept">Approve &amp; email client</button><button type="button" class="portal-button portal-button-secondary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="decline">Decline</button></div>':"")+
+      (v.status==="requested"&&v.admin_accepted_at?'<p class="sales-stage">Waiting for the client to confirm'+(v.confirmation_email_sent_at?'':' · confirmation email needs attention')+'</p>':"")+
      '</article>';
     }).join(""):'<div class="sales-empty-state">No meetings in this group.</div>')+
    '</section>'
@@ -156,7 +158,27 @@ document.getElementById("functionDetailContent").addEventListener("submit",async
  if(e.target.id!=="salesIcpForm")return;e.preventDefault();const form=e.target,b=form.querySelector('button[type="submit"]'),s=document.getElementById("salesIcpStatus");b.disabled=true;s.textContent="Saving…";
  try{const r=await fetch("/api/sales/qualification-profile",{method:"PUT",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({criteria:Object.fromEntries(new FormData(form).entries())})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save profile.");s.textContent="Saved · Profile version "+d.profile.version;}catch(err){s.textContent=err.message;}finally{b.disabled=false;}
 });
-document.getElementById("functionDetailContent").addEventListener("click",async e=>{ const historyButton=e.target.closest(".sales-email-history-button");
+document.getElementById("functionDetailContent").addEventListener("click",async e=>{
+ const meetingButton=e.target.closest(".meeting-decision-button");
+ if(meetingButton){
+  const appointmentId=meetingButton.dataset.appointmentId,decision=meetingButton.dataset.decision;
+  const card=meetingButton.closest(".sales-pipeline-lead"),buttons=card?.querySelectorAll(".meeting-decision-button");
+  buttons?.forEach(button=>button.disabled=true);
+  const count=document.getElementById("salesAppointmentsCount");
+  try{
+   const response=await fetch("/api/sales/appointments/respond",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({appointment_id:appointmentId,decision})});
+   const result=await response.json();
+   if(!response.ok)throw new Error(result.error||"Could not process the meeting decision.");
+   if(result.email_sent===false)throw new Error(result.error||"Approval saved, but the client email was not sent.");
+   if(count)count.textContent=result.message||"Meeting decision saved.";
+   await loadSalesAppointments();await loadSalesPipeline();
+  }catch(error){
+   if(count)count.textContent="Meeting action: "+error.message;
+   buttons?.forEach(button=>button.disabled=false);
+  }
+  return;
+ }
+ const historyButton=e.target.closest(".sales-email-history-button");
  if(historyButton){
   const panel=historyButton.nextElementSibling;
   const leadId=historyButton.dataset.leadId;
