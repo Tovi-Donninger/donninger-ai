@@ -113,7 +113,7 @@ async function handleSalesLeads(request, env) {
   const organisationId = "dev-donninger";
   if (request.method === "GET") {
     const result = await env.DB.prepare(
-      "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, interest_status, created_at, updated_at FROM leads WHERE organisation_id = ? ORDER BY created_at DESC LIMIT 200"
+      "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, created_at, updated_at FROM leads WHERE organisation_id = ? ORDER BY created_at DESC LIMIT 200"
     ).bind(organisationId).all();
     return json({ leads: result.results || [] });
   }
