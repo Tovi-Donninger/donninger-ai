@@ -38,6 +38,7 @@ async function showSalesWorkspace(){
   catch(error){msg.textContent=error.message;}finally{button.disabled=false;}
  });
  document.getElementById("refreshSalesLeads").addEventListener("click",loadSalesLeads);
+ showView("detail");
  await loadSalesLeads();
 }
 async function loadSalesLeads(){
