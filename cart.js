@@ -72,6 +72,24 @@
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && overlay.classList.contains('is-open')) close(); });
 
   const addAll = () => { Object.keys(catalog).forEach(id => { if (!items.some(item => item.id === id)) items.push({ id, title: catalog[id] }); }); save(); toast('All eight functions added to your cart.'); open(); };
+  const addPackage = key => {
+    const packages = {
+      'founder-foundations': ['sales','marketing','finance','operations','management'],
+      'founder-toolkit': ['sales','marketing','customer-service','operations']
+    };
+    const ids = packages[key];
+    if (!ids) return;
+    let added = 0;
+    ids.forEach(id => {
+      if (!items.some(item => item.id === id)) {
+        items.push({ id, title: catalog[id] });
+        added++;
+      }
+    });
+    save();
+    toast(added ? added + ' recommended functions added to your cart.' : 'Those functions are already in your cart.');
+    open();
+  };
 
   const add = id => {
     if (!catalog[id]) return;
@@ -113,6 +131,8 @@
   document.addEventListener('click', event => {
     const addAllButton = event.target.closest('[data-cart-add-all]');
     if (addAllButton) { addAll(); return; }
+    const packageButton = event.target.closest('[data-cart-add-package]');
+    if (packageButton) { addPackage(packageButton.dataset.cartAddPackage); return; }
     const addButton = event.target.closest('[data-cart-add]');
     if (addButton) { add(addButton.dataset.cartAdd); render(); return; }
     const removeButton = event.target.closest('[data-cart-remove]');
