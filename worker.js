@@ -479,11 +479,11 @@ async function handleAdminMeetingDecision(request, env) {
     await sendMeetingEmail(env,{
       action:"send_meeting_confirmation_email",
       email:appointment.email,
-      name:[appointment.first_name,appointment.last_name].filter(Boolean).join(" ")||"there",
-      meeting_time:start.toISOString(),
+      firstName:[appointment.first_name,appointment.last_name].filter(Boolean).join(" ")||"there",
+      meetingTime:start.toISOString(),
       timezone:timezone,
-      confirm_url:origin+"/meeting/respond?token="+encodeURIComponent(accept),
-      decline_url:origin+"/meeting/respond?token="+encodeURIComponent(decline)
+      acceptUrl:origin+"/meeting/respond?token="+encodeURIComponent(accept),
+      declineUrl:origin+"/meeting/respond?token="+encodeURIComponent(decline)
     });
     await env.DB.batch([
       env.DB.prepare("UPDATE sales_appointments SET confirmation_email_sent_at=?,updated_at=? WHERE id=? AND organisation_id=? AND admin_accepted_at IS NOT NULL").bind(new Date().toISOString(),new Date().toISOString(),id,org),
