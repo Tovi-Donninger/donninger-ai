@@ -85,7 +85,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
  if(e.target.closest("#qualifyAllLeads")){
   const b=document.getElementById("qualifyAllLeads"),desc=document.getElementById("qualifiedLeadDefinition"),status=document.getElementById("bulkQualificationStatus"),rules=document.getElementById("extractedQualificationRules"),summary=document.getElementById("bulkQualificationSummary");
   if(desc.value.trim().length<20){status.textContent="Please describe a qualified lead in at least 20 characters.";desc.focus();return;}
-  b.disabled=true;b.textContent="Qualifying leads…";status.textContent="Checking your existing Lead Records and assessing each prospect with Gemini…";rules.innerHTML="";summary.innerHTML="";
+  b.disabled=true;b.textContent="Qualifying leads…";rules.innerHTML="";summary.innerHTML="";let elapsed=0;status.textContent="Connecting to AI…";const progressTimer=setInterval(()=>{elapsed+=5;status.textContent=elapsed<15?"AI is analysing your leads… ("+elapsed+"s)":"Still working — processing leads in batches. ("+elapsed+"s). Please keep this page open.";},5000);
   try{
    const r=await fetch("/api/sales/qualify-batch",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",cache:"no-store",body:JSON.stringify({description:desc.value})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Bulk qualification failed.");
    const c=d.criteria||{},list=a=>Array.isArray(a)&&a.length?'<ul>'+a.map(x=>'<li>'+escapeHtml(x)+'</li>').join("")+'</ul>':'<p>None specified.</p>';
@@ -95,7 +95,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    const failed=(d.errors||[]).map(x=>'<li><strong>'+escapeHtml(x.name||x.lead_id||"Lead")+'</strong>: '+escapeHtml(x.error||"Unknown error")+'</li>').join("");
    summary.innerHTML=stats+'<p>Source database: '+escapeHtml(d.source_lead_count??d.checked)+' Lead Records · Model: '+escapeHtml(d.model||"Gemini")+'</p>'+(d.qualified_count?'<p>Qualified leads were saved to the separate database.</p>':'<p>No leads met the rules this time. The breakdown below explains why.</p>')+(rejected?'<details open><summary>Not qualified ('+d.not_qualified_count+')</summary><ul>'+rejected+'</ul></details>':"")+(failed?'<details open><summary>Failed assessments ('+d.failed_count+')</summary><ul>'+failed+'</ul></details>':"");
    status.textContent="Qualification finished: "+d.checked+" records checked.";await loadQualifiedLeads();
-  }catch(err){status.textContent=err.message;summary.innerHTML='<p class="qualification-error">'+escapeHtml(err.message)+'</p>';}finally{b.disabled=false;b.innerHTML='Qualify Leads <span>✦</span>';}
+  }catch(err){status.textContent=err.message;summary.innerHTML='<p class="qualification-error">'+escapeHtml(err.message)+'</p>';}finally{clearInterval(progressTimer);b.disabled=false;b.innerHTML='Qualify Leads <span>✦</span>';}
  }
  if(e.target.closest("#refreshQualifiedLeads"))loadQualifiedLeads();
 });
