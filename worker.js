@@ -400,13 +400,13 @@ async function handleBulkLeadQualification(request,env){
 async function handleQualifiedLeads(request,env){
  const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
  if(request.method!=="GET")return json({error:"Method not allowed."},405);
- const rows=await env.DB.prepare("SELECT q.lead_id,q.fit_score,q.priority,q.qualification_summary,q.qualification_json,q.qualified_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.pipeline_stage='qualified' ORDER BY q.fit_score DESC,q.qualified_at DESC LIMIT 200").bind("dev-donninger").all();
+ const rows=await env.DB.prepare("SELECT q.lead_id,q.fit_score,q.priority,q.qualification_summary,q.qualification_json,q.qualified_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? ORDER BY q.fit_score DESC,q.qualified_at DESC LIMIT 200").bind("dev-donninger").all();
  return json({qualified_leads:rows.results||[]});
 }
 async function handleUnqualifiedLeads(request,env){
  const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
  if(request.method!=="GET")return json({error:"Method not allowed."},405);
- const rows=await env.DB.prepare("SELECT u.lead_id,u.fit_score,u.qualification_summary,u.qualification_json,u.assessed_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM unqualified_leads u JOIN leads l ON l.id=u.lead_id WHERE u.organisation_id=? AND l.pipeline_stage='unqualified' ORDER BY u.assessed_at DESC LIMIT 200").bind("dev-donninger").all();
+ const rows=await env.DB.prepare("SELECT u.lead_id,u.fit_score,u.qualification_summary,u.qualification_json,u.assessed_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM unqualified_leads u JOIN leads l ON l.id=u.lead_id WHERE u.organisation_id=? ORDER BY u.assessed_at DESC LIMIT 200").bind("dev-donninger").all();
  return json({unqualified_leads:rows.results||[]});
 }
 async function handleSalesPipeline(request, env) {
