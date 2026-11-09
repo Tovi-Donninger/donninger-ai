@@ -562,6 +562,7 @@ async function handleSalesAppointments(request, env) {
       a.prospect_timezone,
       a.prospect_accepted_at,
       a.admin_accepted_at,
+      a.confirmation_email_sent_at,
       a.created_at,
       l.first_name,
       l.last_name,
