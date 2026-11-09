@@ -36,7 +36,7 @@ async function showSalesWorkspace(){
   const rows=[];let row=[],cell="",quoted=false;
   for(let i=0;i<text.length;i++){const ch=text[i];if(quoted){if(ch==='"'&&text[i+1]==='"'){cell+='"';i++;}else if(ch==='"')quoted=false;else cell+=ch;}else if(ch==='"')quoted=true;else if(ch===","){row.push(cell.trim());cell="";}else if(ch==="\\n"||ch==="\\r"){if(ch==="\\r"&&text[i+1]==="\\n")i++;row.push(cell.trim());if(row.some(v=>v!==""))rows.push(row);row=[];cell="";}else cell+=ch;}
   row.push(cell.trim());if(row.some(v=>v!==""))rows.push(row);if(!rows.length)return [];
-  const headers=rows.shift().map(h=>h.replace(/^\\uFEFF/,"").trim().toLowerCase());
+  const headers=rows.shift().map(h=>h.replace(/^\uFEFF/,"").trim().toLowerCase());
   return rows.map(values=>Object.fromEntries(headers.map((h,i)=>[h,values[i]||""]))).filter(r=>r.first_name);
  }
  function previewCsv(file){
