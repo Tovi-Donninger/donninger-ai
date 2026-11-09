@@ -82,6 +82,17 @@ document.getElementById("functionDetailContent").addEventListener("submit",async
  try{const r=await fetch("/api/sales/qualification-profile",{method:"PUT",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({criteria:Object.fromEntries(new FormData(form).entries())})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save profile.");s.textContent="Saved · Profile version "+d.profile.version;}catch(err){s.textContent=err.message;}finally{b.disabled=false;}
 });
 document.getElementById("functionDetailContent").addEventListener("click",async e=>{
+ if(e.target.closest("#addDonningerTestLead")){
+  const button=document.getElementById("addDonningerTestLead"),status=document.getElementById("donningerTestLeadStatus");
+  if(!button||!status)return;
+  button.disabled=true;status.textContent="Adding your test lead…";
+  try{
+   const r=await fetch("/api/sales/test-lead",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:"{}"});
+   const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not add the test lead.");
+   status.textContent=d.message||"Tovi test lead added.";await loadSalesLeads();
+  }catch(error){status.textContent=error.message;}
+  finally{button.disabled=false;}
+ }
  if(e.target.closest("#qualifyAllLeads")){
   const b=document.getElementById("qualifyAllLeads"),desc=document.getElementById("qualifiedLeadDefinition"),status=document.getElementById("bulkQualificationStatus"),rules=document.getElementById("extractedQualificationRules"),summary=document.getElementById("bulkQualificationSummary");
   if(desc.value.trim().length<20){status.textContent="Please describe a qualified lead in at least 20 characters.";desc.focus();return;}
