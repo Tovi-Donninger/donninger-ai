@@ -424,17 +424,43 @@ async function createAssessmentPdf(report,isBusiness) {
     heading(p3,'Planning notes',681);
     addField(p3,'founder_notes','Use this space to record assumptions, questions and decisions as you validate the business idea.',LEFT,714,CONTENT,54,{fontSize:8,maxLength:350});
 
-    const p4=addPage('Important information',4);
+    const p4=addPage('Recommended products & pricing',4);
+    const founderProducts=report.recommendedFunctions||[];
+    const founderCount=founderProducts.length;
+    const founderSetup=founderCount*200;
+    const founderMonthly=founderCount*20;
+    const founderBundle=founderCount>=5;
     heading(p4,'Assessment approach',100);
-    addField(p4,'founder_methodology',methodology,LEFT,133,CONTENT,120,{fontSize:9,maxLength:800});
-    heading(p4,'Important assessment notes',282);
-    addField(p4,'founder_disclaimer',report.disclaimer||'This is an initial planning report, not professional advice.',LEFT,315,CONTENT,120,{fontSize:9,maxLength:800});
-    heading(p4,'Recommended Donninger.AI products & packages',470);
-    drawText(p4,'Focused proposal: '+(report.recommendedFunctions||[]).length+' products',LEFT,505,7,regular,ink);
-    drawText(p4,'Individual pricing: $200 setup + $20/month per product. Complete platform: $1,000 setup + $100/month for all eight.',LEFT,532,7,bold,ink);
-    drawText(p4,(report.recommendedFunctions||[]).length>=5?'At five or more recommended products, the complete platform is the stronger-value option.':'Start with the focused products identified in this assessment. The complete platform remains available as your business grows.',LEFT,559,7,regular,ink);
-    heading(p4,'Pricing terms',620);
-    addField(p4,'founder_pricing_terms','Monthly fees include maintenance, support, upkeep and additions to the Donninger.AI product offering. Third-party subscriptions, messaging charges and usage-based AI/API costs are separate and disclosed before commitment. Implementation scope and integrations are confirmed before work begins.',LEFT,653,CONTENT,105,{fontSize:7,maxLength:700});
+    addField(p4,'founder_methodology',methodology,LEFT,133,CONTENT,65,{fontSize:8,maxLength:500});
+    heading(p4,'Important assessment notes',218);
+    addField(p4,'founder_disclaimer',report.disclaimer||'This is an initial planning report, not professional advice.',LEFT,251,CONTENT,70,{fontSize:8,maxLength:500});
+    heading(p4,'Recommended Donninger.AI products',340);
+    const founderProductText=founderProducts.length
+      ? founderProducts.map((name,i)=>(i+1)+'. '+name+' — $200 one-time setup + $20/month').join('\n')
+      : 'No paid product package is recommended from the information supplied. We suggest a short workflow-discovery discussion before selecting products.';
+    addField(p4,'founder_recommended_products',founderProductText,LEFT,373,CONTENT,135,{fontSize:8.5,maxLength:1100});
+    heading(p4,'Your package options',526);
+    const packageTop=559;
+    rect(p4,LEFT,packageTop,CONTENT,27,ink,ink);
+    [['PACKAGE',LEFT+7],['SETUP',LEFT+255],['MONTHLY',LEFT+330],['FIRST YEAR',LEFT+415]].forEach(([label,x])=>p4.drawText(pdfWinAnsiText(label),{x,y:H-packageTop-18,size:7,font:bold,color:white}));
+    const founderRows=[
+      ['Focused ('+founderCount+' products)','$'+founderSetup.toLocaleString(),'$'+founderMonthly.toLocaleString(),'$'+(founderSetup+founderMonthly*12).toLocaleString()],
+      ['Complete platform (8)','$1,000','$100','$2,200']
+    ];
+    founderRows.forEach((row,i)=>{
+      const top=packageTop+27+i*30;
+      rect(p4,LEFT,top,CONTENT,30,i%2?white:pale,line);
+      p4.drawText(pdfWinAnsiText(row[0]),{x:LEFT+7,y:H-top-19,size:7,font:bold,color:ink});
+      row.slice(1).forEach((value,j)=>p4.drawText(pdfWinAnsiText(value),{x:[LEFT+255,LEFT+330,LEFT+415][j],y:H-top-19,size:7,font:regular,color:ink}));
+    });
+    heading(p4,'Our recommendation',654);
+    const founderRecommendation=founderCount===0
+      ? 'No paid package is recommended yet. Confirm the business model and first operational needs before investing.'
+      : founderBundle
+        ? 'The complete eight-function platform is the stronger-value option at $1,000 setup + $100/month and includes all eight functions.'
+        : 'Start with the focused products listed above at $'+founderSetup.toLocaleString()+' setup + $'+founderMonthly+'/month. You can add functions as the business grows.';
+    addField(p4,'founder_package_recommendation',founderRecommendation,LEFT,687,CONTENT,48,{fontSize:8,maxLength:350});
+    drawText(p4,'Monthly fees include maintenance and support. Third-party subscriptions, messaging and usage-based AI/API charges are separate. Final scope and integrations are agreed before work begins.',LEFT,754,6.5,regular,muted);
   }
   // Rasterise every finished page into a new image-only PDF, removing editable text objects and form fields.
   const sourceBytes=await pdf.save();
