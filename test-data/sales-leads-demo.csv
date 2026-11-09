@@ -1,0 +1,7 @@
+first_name,last_name,company,email,phone,job_title,customer_need,contact_permission,source
+Maya,Levi,Northstar Dental, maya.levi@example.com,+1-202-555-0101,Practice Manager,"Wants to capture website enquiries, qualify patient requests and reduce missed appointment calls.",unknown,demo_csv_import
+Daniel,Cohen,BluePeak Logistics,daniel.cohen@example.com,+1-202-555-0102,Operations Director,"Needs a central view of inbound business leads and automatic follow-up task reminders.",unknown,demo_csv_import
+Olivia,Martin,Harbor & Pine Retail,olivia.martin@example.com,+1-202-555-0103,Owner,"Interested in connecting stock availability with supplier reorder reminders and customer enquiries.",unknown,demo_csv_import
+Ethan,Reed,ClearPath Consulting,ethan.reed@example.com,+1-202-555-0104,Managing Partner,"Wants to improve lead response times and track which prospects request a consultation.",unknown,demo_csv_import
+Sofia,Nguyen,Greenline Property Group,sofia.nguyen@example.com,+1-202-555-0105,Sales Coordinator,"Looking for a way to organise property enquiries, record requirements and assign follow-up.",unknown,demo_csv_import
+Noah,Brooks,Test Opt-Out Co,noah.brooks@example.com,+1-202-555-0106,Office Manager,"Demo record to verify that do-not-contact status is retained and respected.",do_not_contact,demo_csv_import
