@@ -1,5 +1,5 @@
 {
-  "name": "donninger-ai",
+  "name": "donninger-ai-development",
   "main": "worker.js",
   "compatibility_date": "2026-11-08",
   "vars": {
@@ -17,8 +17,8 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "donninger-ai-db",
-      "database_id": "c3d43b39-c0f5-4022-abbe-4fb855d38357",
+      "database_name": "donninger-ai-development-db",
+      "database_id": "REPLACE_WITH_DEVELOPMENT_D1_DATABASE_ID",
       "migrations_dir": "migrations"
     }
   ]
