@@ -305,7 +305,7 @@ async function handleBulkLeadQualification(request,env){
  const description=String(body.description||"").trim().slice(0,5000);
  if(description.length<20)return json({error:"Please describe what a qualified lead means in at least 20 characters."},400);
  const org="dev-donninger";let model=String(env.GEMINI_MODEL||"gemini-3.5-flash-lite").trim();
- const leadsResult=await env.DB.prepare("SELECT id,first_name,last_name,email,phone,company,job_title,source,customer_need,status FROM leads WHERE organisation_id=? ORDER BY created_at DESC LIMIT 200").bind(org).all();
+ const leadsResult=await env.DB.prepare("SELECT id,first_name,last_name,email,phone,company,job_title,source,customer_need,status FROM leads WHERE organisation_id=? AND status='new' ORDER BY created_at DESC LIMIT 200").bind(org).all();
  const leads=leadsResult.results||[];
  if(!leads.length)return json({error:"There are no imported leads to qualify yet."},400);
  const criteriaSchema={type:"OBJECT",properties:{definition:{type:"STRING"},must_have:{type:"ARRAY",items:{type:"STRING"}},strong_signals:{type:"ARRAY",items:{type:"STRING"}},disqualifiers:{type:"ARRAY",items:{type:"STRING"}},unknown_handling:{type:"STRING"},qualification_threshold:{type:"INTEGER"}},required:["definition","must_have","strong_signals","disqualifiers","unknown_handling","qualification_threshold"]};
