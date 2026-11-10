@@ -165,37 +165,6 @@ async function handleSalesLeads(request, env) {
   }
   return json({ error: "Method not allowed." }, 405, { allow: "GET, POST, PUT" });
 }
-async function handleDonningerTestLead(request, env) {
-  const auth = await requireAdmin(request, env);
-  if (auth.error) return auth.error;
-  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
-  const org = "dev-donninger";
-  const email = "tovidonninger@gmail.com";
-  const existing = await env.DB.prepare("SELECT id, source FROM leads WHERE organisation_id=? AND lower(email)=lower(?) ORDER BY created_at DESC LIMIT 1").bind(org, email).first();
-  if (existing && existing.source !== "donninger_ai_self_test") {
-    return json({ error: "A lead with your email already exists. It was left unchanged; please use that existing record." }, 409);
-  }
-  const details = {
-    first_name: "Tovi", last_name: "Donninger", email,
-    phone: "", company: "Donninger.AI", job_title: "Founder & CEO",
-    source: "donninger_ai_self_test",
-    customer_need: "I am the founder of Donninger.AI and actively operate the business. I want to use our own AI business automation and sales tools to generate more customers, improve sales conversion, automate lead qualification and personalised outreach, and test whether Donninger.AI can use its own sales workflow to win customers.",
-    contact_permission: "consent_given"
-  };
-  let id;
-  if (existing) {
-    id = existing.id;
-    await env.DB.prepare("UPDATE leads SET first_name=?,last_name=?,company=?,job_title=?,source=?,customer_need=?,contact_permission=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?")
-      .bind(details.first_name, details.last_name, details.company, details.job_title, details.source, details.customer_need, details.contact_permission, id, org).run();
-  } else {
-    id = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO leads (id,organisation_id,first_name,last_name,email,phone,company,job_title,source,customer_need,contact_permission) VALUES (?,?,?,?,?,?,?,?,?,?,?)")
-      .bind(id, org, details.first_name, details.last_name, details.email, details.phone, details.company, details.job_title, details.source, details.customer_need, details.contact_permission).run();
-  }
-  await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'lead_created',?,?)")
-    .bind(crypto.randomUUID(), org, id, JSON.stringify({ source: details.source, self_test: true, recipient_authorised_by_user: true }), auth.session.email).run();
-  return json({ success: true, created: !existing, lead: { id, ...details }, message: existing ? "Your Donninger.AI test lead was refreshed." : "Your Donninger.AI test lead was added. Run AI qualification to assess it." }, existing ? 200 : 201);
-}
 
 async function handleSalesLeadImport(request, env) {
   const auth = await requireAdmin(request, env);
@@ -823,46 +792,60 @@ async function handleSalesOutreachSend(request, env) {
   let body;
   try { body = await request.json(); } catch { return json({ error: "Invalid send request." }, 400); }
   const ids = [...new Set((Array.isArray(body.lead_ids) ? body.lead_ids : []).map(v => String(v || "").trim()).filter(Boolean))];
-  if (ids.length !== 1) return json({ error: "The first live-email test is restricted to one lead: James Wilson." }, 400);
+  if (!ids.length || ids.length > 10) return json({ error: "Select between 1 and 10 qualified leads." }, 400);
+
   const org = "dev-donninger";
-  const lead = await env.DB.prepare("SELECT l.id,l.first_name,l.last_name,l.email,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.organisation_id=? AND l.id=? LIMIT 1").bind(org,org,ids[0]).first();
-  if (!lead) return json({ error: "James Wilson must be in Qualified Leads before sending." }, 404);
-  const recipient = String(lead.email || "").trim().toLowerCase();
-  if ((lead.first_name || "").trim().toLowerCase() !== "james" || (lead.last_name || "").trim().toLowerCase() !== "wilson" || recipient !== "james.bond.annonomys@gmail.com") {
-    return json({ error: "Live sending is locked to the authorised James Wilson test address." }, 403);
+  const eligible = [], skipped = [];
+  for (const leadId of ids) {
+    const lead = await env.DB.prepare("SELECT l.id,l.first_name,l.last_name,l.email,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.organisation_id=? AND l.id=? LIMIT 1").bind(org,org,leadId).first();
+    if (!lead) { skipped.push({lead_id:leadId,reason:"Lead is no longer in Qualified Leads."}); continue; }
+    const recipient = String(lead.email || "").trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(recipient)) { skipped.push({lead_id:leadId,reason:"A valid email address is required."}); continue; }
+    if (lead.contact_permission !== "consent_given") { skipped.push({lead_id:leadId,reason:lead.contact_permission==="do_not_contact"?"This lead has opted out or is marked Do Not Contact.":"Recorded email consent is required. No email was sent."}); continue; }
+    const prior = await env.DB.prepare("SELECT id FROM sales_messages WHERE organisation_id=? AND lead_id=? AND direction='outbound' AND channel='email' AND status='sent' ORDER BY created_at DESC LIMIT 1").bind(org,lead.id).first();
+    if (prior) { skipped.push({lead_id:leadId,reason:"An outbound email is already recorded as sent. Duplicate sending is blocked."}); continue; }
+    eligible.push(lead);
   }
-  if (lead.contact_permission !== "consent_given") return json({ error: "Recorded email consent is required. No email was sent." }, 403);
-  const prior = await env.DB.prepare("SELECT id FROM sales_messages WHERE organisation_id=? AND lead_id=? AND direction='outbound' AND channel='email' AND status='sent' ORDER BY created_at DESC LIMIT 1").bind(org,lead.id).first();
-  if (prior) return json({ error: "A test email has already been recorded as sent to James Wilson. Duplicate sending is blocked." }, 409);
-  const draftRequest = new Request(request.url, { method: "POST", headers: request.headers, body: JSON.stringify({ lead_ids: ids }) });
+  if (!eligible.length) return json({success:false,sent:[],skipped,message:"No eligible leads could be contacted."}, 400);
+
+  const draftRequest = new Request(request.url, { method:"POST", headers:request.headers, body:JSON.stringify({lead_ids:eligible.map(lead=>lead.id)}) });
   const draftResponse = await handleSalesOutreachDrafts(draftRequest, env);
   const draftData = await draftResponse.json();
-  if (!draftResponse.ok || !draftData.drafts?.length) return json({ error: draftData.skipped?.[0]?.reason || draftData.error || "Could not prepare the personalised email." }, 502);
-  const draft = draftData.drafts[0];
-  const upstream = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      token: env.DONNINGER_EMAIL_TOKEN,
-      action: "send_sales_outreach_email",
-      email: recipient,
-      lead_name: "James Wilson",
-      message_id: draft.message_id,
-      subject: draft.subject,
-      body: draft.body
-    }),
-    redirect: "follow"
-  });
-  const upstreamText = await upstream.text();
-  let result;
-  try { result = JSON.parse(upstreamText); } catch { result = null; }
-  if (!upstream.ok || !result || result.success !== true) {
-    console.error("Sales Gmail send failed:", upstream.status, upstreamText.slice(0,500));
-    return json({ error: result?.message || "Gmail did not confirm the send. The draft is saved; check Gmail before retrying." }, 502);
+  if (!draftResponse.ok || !draftData.drafts?.length) return json({error:draftData.skipped?.[0]?.reason || draftData.error || "Could not prepare personalised emails.",skipped}, 502);
+
+  const sent = [], failed = [];
+  for (const draft of draftData.drafts) {
+    try {
+      const upstream = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+        method:"POST",
+        headers:{"content-type":"application/json"},
+        body:JSON.stringify({
+          token:env.DONNINGER_EMAIL_TOKEN,
+          action:"send_sales_outreach_email",
+          email:draft.recipient,
+          lead_name:draft.name,
+          message_id:draft.message_id,
+          subject:draft.subject,
+          body:draft.body
+        }),
+        redirect:"follow"
+      });
+      const upstreamText = await upstream.text();
+      let result;
+      try { result=JSON.parse(upstreamText); } catch { result=null; }
+      if (!upstream.ok || !result || result.success!==true) {
+        failed.push({lead_id:draft.lead_id,recipient:draft.recipient,reason:result?.message || "Gmail did not confirm sending."});
+        continue;
+      }
+      await env.DB.prepare("UPDATE sales_messages SET status='sent',approval_status='approved' WHERE id=? AND organisation_id=? AND lead_id=?").bind(draft.message_id,org,draft.lead_id).run();
+      await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_email_sent',?,?)").bind(crypto.randomUUID(),org,draft.lead_id,JSON.stringify({message_id:draft.message_id,recipient:draft.recipient,subject:draft.subject,provider:"gmail"}),auth.session.email).run();
+      sent.push({lead_id:draft.lead_id,name:draft.name,recipient:draft.recipient,subject:draft.subject});
+    } catch(error) {
+      failed.push({lead_id:draft.lead_id,recipient:draft.recipient,reason:"Gmail send request failed. Check the inbox before retrying."});
+      console.error("Sales email send failed:",String(error.message||error));
+    }
   }
-  await env.DB.prepare("UPDATE sales_messages SET status='sent',approval_status='approved' WHERE id=? AND organisation_id=? AND lead_id=?").bind(draft.message_id,org,lead.id).run();
-  await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_email_sent',?,?)").bind(crypto.randomUUID(),org,lead.id,JSON.stringify({message_id:draft.message_id,recipient,subject:draft.subject,provider:"gmail",test_restricted:true}),auth.session.email).run();
-  return json({ success:true, sent:true, recipient, name:"James Wilson", subject:draft.subject, message:"Personalised test email sent to James Wilson." });
+  return json({success:sent.length>0,sent,failed,skipped,message:sent.length+" email(s) sent; "+failed.length+" failed; "+skipped.length+" skipped."});
 }
 
 function cleanSalesEmailBody(value) {
@@ -1021,7 +1004,6 @@ async function handleApi(request, env) {
   const url = new URL(request.url);
   if (url.pathname === "/api/reports/send") return handleReportSend(request, env);
   if (url.pathname === "/api/sales/leads") return handleSalesLeads(request, env);
-  if (url.pathname === "/api/sales/test-lead") return handleDonningerTestLead(request, env);
    if (url.pathname === "/api/sales/leads/import") return handleSalesLeadImport(request, env);
   if (url.pathname === "/api/sales/qualification-profile") return handleQualificationProfile(request, env);
   if (url.pathname === "/api/sales/qualifications") return handleLeadQualifications(request, env);
