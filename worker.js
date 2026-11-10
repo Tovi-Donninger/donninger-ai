@@ -590,10 +590,36 @@ async function handleClientMeetingResponse(request,env) {
     if(!/^[A-Za-z0-9_-]{40,60}$/.test(token)||!["accept","decline"].includes(decision))return new Response("Invalid response.",{status:400});
     const hash=await meetingTokenHash(token);
     const purpose=decision==="accept"?"client_accept":"client_decline";
-    const record=await env.DB.prepare("SELECT t.id AS token_id,t.appointment_id,a.lead_id,a.status,a.admin_accepted_at,l.first_name,l.email FROM sales_appointment_tokens t JOIN sales_appointments a ON a.id=t.appointment_id JOIN leads l ON l.id=a.lead_id WHERE t.token_hash=? AND t.organisation_id=? AND t.purpose=? AND t.used_at IS NULL AND t.expires_at>?").bind(hash,"dev-donninger",purpose,new Date().toISOString()).first();
+    const record=await env.DB.prepare("SELECT t.id AS token_id,t.appointment_id,a.lead_id,a.status,a.admin_accepted_at,a.requested_start_at,a.duration_minutes,a.prospect_timezone,a.timezone,a.discussion_summary,l.first_name,l.last_name,l.email,l.company FROM sales_appointment_tokens t JOIN sales_appointments a ON a.id=t.appointment_id JOIN leads l ON l.id=a.lead_id WHERE t.token_hash=? AND t.organisation_id=? AND t.purpose=? AND t.used_at IS NULL AND t.expires_at>?").bind(hash,"dev-donninger",purpose,new Date().toISOString()).first();
     if(!record||record.status!=="requested")return new Response("This meeting response link has expired or has already been used.",{status:410});
     if(!record.admin_accepted_at)return new Response("The administrator has not approved this meeting time yet.",{status:409});
     const now=new Date().toISOString();
+    if(decision==="accept"){
+      // Create the Calendar event only after admin approval and lead acceptance.
+      try{
+        const booking=await sendMeetingEmail(env,{
+          action:"book_sales_meeting",
+          appointment_id:record.appointment_id,
+          email:record.email,
+          name:[record.first_name,record.last_name].filter(Boolean).join(" ")||"there",
+          company:record.company||"",
+          meeting_time:record.requested_start_at,
+          timezone:record.prospect_timezone||record.timezone||"Asia/Jerusalem",
+          duration_minutes:Number(record.duration_minutes||30),
+          summary:record.discussion_summary||"",
+          admin_approved:true,
+          prospect_accepted:true
+        });
+        if(booking.booked!==true)return new Response("The calendar invitation could not be created. Your response has not been finalised; please contact Donninger.AI.",{status:502});
+        await sendMeetingEmail(env,{
+          action:"send_meeting_admin_notification",
+          message:"The lead accepted the approved Donninger.AI meeting and a Google Calendar invitation was created.\\n\\nClient: "+(record.first_name||"")+" "+(record.last_name||"")+"\\nEmail: "+record.email+"\\nAppointment ID: "+record.appointment_id+"\\nCalendar event: "+(booking.event_id||"created")
+        });
+      }catch(error){
+        console.error("Calendar invitation creation failed after client acceptance:",error);
+        return new Response("Your acceptance was received, but the calendar invitation could not yet be created. Please contact Donninger.AI; the request has not been marked confirmed.",{status:502});
+      }
+    }
     const nextStatus=decision==="accept"?"confirmed":"cancelled";
     const appointmentUpdate=await env.DB.batch([
       decision==="accept"
@@ -987,31 +1013,11 @@ async function handleSalesReplyIngest(request, env) {
     meetingAppointmentId = active?.id || crypto.randomUUID();
 
     if (meetingStart && meetingTimezone) {
-      try {
-        const booking = await sendMeetingEmail(env, {
-          action: "book_sales_meeting",
-          appointment_id: meetingAppointmentId,
-          email: lead.email,
-          name: [lead.first_name,lead.last_name].filter(Boolean).join(" ") || "there",
-          company: lead.company || "",
-          meeting_time: meetingStart,
-          timezone: meetingTimezone,
-          duration_minutes: meetingDuration,
-          summary: meetingSummary
-        });
-        if (booking.booked === true) {
-          meetingBooked = true;
-          statements.push(env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_calendar_booked',?,?)")
-            .bind(crypto.randomUUID(),org,lead.id,JSON.stringify({appointment_id:meetingAppointmentId,calendar_event_id:booking.event_id,meeting_start:meetingStart,timezone:meetingTimezone,duration_minutes:meetingDuration}),"AI email assistant"));
-        } else {
-          outboundReply = "Hi " + (lead.first_name || "there") + ",\n\nThank you for suggesting a meeting time. Unfortunately, that time is not available in our calendar. Could you please suggest another date and time that would work for you, and include your timezone?\n\nI'll check the alternative and get back to you.\n\nKind regards,\nTovi Donninger\nFounder, Donninger.AI";
-        }
-      } catch (error) {
-        console.error("Automatic calendar booking failed:",error);
-        outboundReply = "Hi " + (lead.first_name || "there") + ",\n\nThank you for suggesting a meeting time. We're checking availability and will follow up shortly to confirm a suitable time. No meeting has been booked yet.\n\nKind regards,\nTovi Donninger\nFounder, Donninger.AI";
-      }
+      // A lead proposal is NOT a booking. Keep the appointment pending until
+      // the administrator approves it and the lead later accepts the invitation.
+      outboundReply = "Hi " + (lead.first_name || "there") + ",\\n\\nThank you for suggesting a meeting time. I've received your proposal and will check it with our team. We'll send you an official Google Calendar invitation once the time has been approved. No meeting has been booked yet.\\n\\nKind regards,\\nTovi Donninger\\nFounder, Donninger.AI";
     } else {
-      outboundReply = suggestedReply || ("Hi " + (lead.first_name || "there") + ",\n\nThank you for getting back to us. Could you please suggest a suitable date, time and timezone for a short Zoom meeting?\n\nKind regards,\nTovi Donninger\nFounder, Donninger.AI");
+      outboundReply = suggestedReply || ("Hi " + (lead.first_name || "there") + ",\\n\\nThank you for getting back to us. Could you please suggest a suitable date, time and timezone for a short Zoom meeting?\\n\\nKind regards,\\nTovi Donninger\\nFounder, Donninger.AI");
     }
 
     const meetingNow = new Date().toISOString();
