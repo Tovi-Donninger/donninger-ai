@@ -125,3 +125,12 @@
 .lead-edit-actions{display:flex;justify-content:flex-end;gap:9px}
 .lead-edit-actions button{margin:0}
 @media(max-width:580px){.lead-edit-dialog{padding:19px}.lead-edit-form{grid-template-columns:1fr}.lead-edit-wide,.lead-edit-message,.lead-edit-actions{grid-column:auto}.lead-edit-actions{flex-direction:column-reverse}.lead-edit-actions button{width:100%}}
+
+/* Individual sales outreach draft review */
+.sales-email-draft-card{border:1px solid var(--line,#dce3ee);border-radius:14px;padding:18px;margin-top:14px;background:var(--surface,#fff)}
+.sales-draft-heading{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.sales-draft-heading strong{font-size:15px}
+.sales-draft-heading span,.sales-email-draft-card>p{color:var(--muted,#68758a);font-size:13px}
+.sales-email-draft-card label{display:block;margin:12px 0 6px;font-size:13px;font-weight:600}
+.sales-email-draft-card input,.sales-email-draft-card textarea{display:block;width:100%;margin-top:6px;padding:11px;border:1px solid var(--line,#dce3ee);border-radius:8px;font:inherit;background:#fff;color:#18243a}
+.sales-email-draft-card textarea{resize:vertical;line-height:1.55}
