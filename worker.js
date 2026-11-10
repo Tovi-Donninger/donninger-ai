@@ -382,7 +382,7 @@ async function handleBulkLeadQualification(request,env){
       }else if(result.classification==="needs_review"){
        statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
        statements.push(env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
-       statements.push(env.DB.prepare("UPDATE leads SET status='review',pipeline_stage='needs_review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
+       statements.push(env.DB.prepare("UPDATE leads SET status='review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
        needsReview.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,summary:result.summary||"",gaps:result.gaps||[],recommended_next_action:result.recommended_next_action||""});
       }else{
        statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
@@ -430,7 +430,7 @@ async function handleReviewLeads(request,env){
   if(!lead)return json({error:"This unqualified lead could not be found. Refresh the table and try again."},404);
   await env.DB.batch([
    env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,leadId),
-   env.DB.prepare("UPDATE leads SET status='review',pipeline_stage='needs_review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='lost'").bind(org,leadId)
+   env.DB.prepare("UPDATE leads SET status='review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='lost'").bind(org,leadId)
   ]);
   return json({success:true,message:"Lead moved to Needs Review."});
  }
