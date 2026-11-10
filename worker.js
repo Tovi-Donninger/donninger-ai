@@ -950,15 +950,18 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/contact-test-lead") return handleSalesContactTestLead(request, env);
   if (url.pathname === "/api/sales/email-reply") return handleSalesReplyIngest(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
-    if (!env.DEV_ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Development authentication is not configured. Add the required Worker secrets in Cloudflare." }, 503);
-    if (!env.DEV_ADMIN_ENABLED || env.DEV_ADMIN_ENABLED !== "true") return json({ error: "Development administrator access is disabled." }, 403);
+    // Production founder/admin login. Credentials are Cloudflare Worker secrets,
+    // never public Wrangler vars or development-only flags.
+    if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD || !env.SESSION_SECRET) {
+      return json({ error: "Production administrator login is not configured. Add ADMIN_EMAIL, ADMIN_PASSWORD and SESSION_SECRET as Worker secrets in Cloudflare." }, 503);
+    }
     if (!request.headers.get("content-type")?.includes("application/json")) return json({ error: "Invalid request." }, 415);
     let body;
     try { body = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
-    const expectedEmail = (env.DEV_ADMIN_EMAIL || "admin@donninger.ai").trim().toLowerCase();
+    const expectedEmail = String(env.ADMIN_EMAIL).trim().toLowerCase();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
-    if (!constantTimeEqual(email, expectedEmail) || !constantTimeEqual(password, env.DEV_ADMIN_PASSWORD)) {
+    if (!constantTimeEqual(email, expectedEmail) || !constantTimeEqual(password, env.ADMIN_PASSWORD)) {
       return json({ error: "The email address or password is incorrect." }, 401);
     }
     const token = await makeSession(expectedEmail, env.SESSION_SECRET);
