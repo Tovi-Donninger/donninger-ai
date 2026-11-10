@@ -840,7 +840,12 @@ async function handleSalesOutreachSend(request, env) {
         continue;
       }
       await env.DB.prepare("UPDATE sales_messages SET status='sent',approval_status='approved' WHERE id=? AND organisation_id=? AND lead_id=?").bind(draft.message_id,org,draft.lead_id).run();
+      const previousStage = await env.DB.prepare("SELECT pipeline_stage FROM leads WHERE id=? AND organisation_id=?").bind(draft.lead_id,org).first();
+      await env.DB.prepare("UPDATE leads SET pipeline_stage='contacted',status='contacted',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?").bind(draft.lead_id,org).run();
       await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_email_sent',?,?)").bind(crypto.randomUUID(),org,draft.lead_id,JSON.stringify({message_id:draft.message_id,recipient:draft.recipient,subject:draft.subject,provider:"gmail"}),auth.session.email).run();
+      if (previousStage && previousStage.pipeline_stage !== "contacted") {
+        await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'pipeline_stage_changed',?,?)").bind(crypto.randomUUID(),org,draft.lead_id,JSON.stringify({from:previousStage.pipeline_stage,to:"contacted",reason:"Initial outreach email confirmed sent by Gmail"}),auth.session.email).run();
+      }
       sent.push({lead_id:draft.lead_id,name:draft.name,recipient:draft.recipient,subject:draft.subject});
     } catch(error) {
       failed.push({lead_id:draft.lead_id,recipient:draft.recipient,reason:"Gmail send request failed. Check the inbox before retrying."});
