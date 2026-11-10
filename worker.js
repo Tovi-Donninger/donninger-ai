@@ -815,6 +815,56 @@ async function handleSalesOutreachDrafts(request, env) {
   return json({success:true,drafts,skipped,message:drafts.length+" personalised draft(s) created. Nothing has been sent."});
 }
 
+async function handleSalesOutreachSend(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+  if (!env.DONNINGER_EMAIL_TOKEN) return json({ error: "Gmail sending is not configured. Add DONNINGER_EMAIL_TOKEN as a Worker secret." }, 503);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid send request." }, 400); }
+  const ids = [...new Set((Array.isArray(body.lead_ids) ? body.lead_ids : []).map(v => String(v || "").trim()).filter(Boolean))];
+  if (ids.length !== 1) return json({ error: "The first live-email test is restricted to one lead: James Wilson." }, 400);
+  const org = "dev-donninger";
+  const lead = await env.DB.prepare("SELECT l.id,l.first_name,l.last_name,l.email,l.contact_permission FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.organisation_id=? AND l.id=? LIMIT 1").bind(org,org,ids[0]).first();
+  if (!lead) return json({ error: "James Wilson must be in Qualified Leads before sending." }, 404);
+  const recipient = String(lead.email || "").trim().toLowerCase();
+  if ((lead.first_name || "").trim().toLowerCase() !== "james" || (lead.last_name || "").trim().toLowerCase() !== "wilson" || recipient !== "james.bond.annonomys@gmail.com") {
+    return json({ error: "Live sending is locked to the authorised James Wilson test address." }, 403);
+  }
+  if (lead.contact_permission !== "consent_given") return json({ error: "Recorded email consent is required. No email was sent." }, 403);
+  const prior = await env.DB.prepare("SELECT id FROM sales_messages WHERE organisation_id=? AND lead_id=? AND direction='outbound' AND channel='email' AND status='sent' ORDER BY created_at DESC LIMIT 1").bind(org,lead.id).first();
+  if (prior) return json({ error: "A test email has already been recorded as sent to James Wilson. Duplicate sending is blocked." }, 409);
+  const draftRequest = new Request(request.url, { method: "POST", headers: request.headers, body: JSON.stringify({ lead_ids: ids }) });
+  const draftResponse = await handleSalesOutreachDrafts(draftRequest, env);
+  const draftData = await draftResponse.json();
+  if (!draftResponse.ok || !draftData.drafts?.length) return json({ error: draftData.skipped?.[0]?.reason || draftData.error || "Could not prepare the personalised email." }, 502);
+  const draft = draftData.drafts[0];
+  const upstream = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      token: env.DONNINGER_EMAIL_TOKEN,
+      action: "send_sales_outreach_email",
+      email: recipient,
+      lead_name: "James Wilson",
+      message_id: draft.message_id,
+      subject: draft.subject,
+      body: draft.body
+    }),
+    redirect: "follow"
+  });
+  const upstreamText = await upstream.text();
+  let result;
+  try { result = JSON.parse(upstreamText); } catch { result = null; }
+  if (!upstream.ok || !result || result.success !== true) {
+    console.error("Sales Gmail send failed:", upstream.status, upstreamText.slice(0,500));
+    return json({ error: result?.message || "Gmail did not confirm the send. The draft is saved; check Gmail before retrying." }, 502);
+  }
+  await env.DB.prepare("UPDATE sales_messages SET status='sent',approval_status='approved' WHERE id=? AND organisation_id=? AND lead_id=?").bind(draft.message_id,org,lead.id).run();
+  await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_email_sent',?,?)").bind(crypto.randomUUID(),org,lead.id,JSON.stringify({message_id:draft.message_id,recipient,subject:draft.subject,provider:"gmail",test_restricted:true}),auth.session.email).run();
+  return json({ success:true, sent:true, recipient, name:"James Wilson", subject:draft.subject, message:"Personalised test email sent to James Wilson." });
+}
+
 function cleanSalesEmailBody(value) {
   let text = String(value || "").replace(/\r\n/g, "\n").trim();
 
@@ -985,6 +1035,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
   if (url.pathname === "/api/sales/email-history") return handleSalesEmailHistory(request, env);
   if (url.pathname === "/api/sales/outreach/drafts") return handleSalesOutreachDrafts(request, env);
+  if (url.pathname === "/api/sales/outreach/send") return handleSalesOutreachSend(request, env);
   if (url.pathname === "/api/sales/email-reply") return handleSalesReplyIngest(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     // Production founder/admin login. Credentials are Cloudflare Worker secrets,
