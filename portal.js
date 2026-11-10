@@ -293,10 +293,10 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   let insightIndex=0;
   const insightTimer=setInterval(()=>{insightIndex=(insightIndex+1)%insights.length;$("qualificationInsightText").textContent=insights[insightIndex];},6500);
   const progressTimer=setInterval(()=>{elapsed++;timerLabel.textContent="Elapsed: "+formatElapsed(elapsed);},1000);
-  const updateProgress=(processed,total,qualified,notQualified,failed)=>{
+  const updateProgress=(processed,total,qualified,notQualified,failed,needsReview)=>{
    totalLeads=total||totalLeads;const pct=totalLeads?Math.round(processed/totalLeads*92):0;
    bar.style.width=pct+"%";percentLabel.textContent=pct+"%";countLabel.textContent=processed+" of "+totalLeads+" leads processed";
-   stageLabel.textContent=qualified+" qualified · "+notQualified+" unqualified"+(failed?" · "+failed+" failed":"");
+   stageLabel.textContent=qualified+" qualified · "+(needsReview||0)+" needs review · "+notQualified+" unqualified"+(failed?" · "+failed+" failed":"");
    status.textContent="AI assessed "+processed+" of "+totalLeads+" leads.";
   };
   status.textContent="AI qualification is starting…";
@@ -311,7 +311,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
      setStep(3);copyLabel.textContent="Your qualification rules are ready. The AI is now checking each prospect against them.";stageLabel.textContent="Qualification criteria extracted · Profile "+event.profile_version;
      const c=event.criteria||{},list=a=>Array.isArray(a)&&a.length?'<ul>'+a.map(x=>'<li>'+escapeHtml(x)+'</li>').join("")+'</ul>':'<p>None specified.</p>';
      rules.innerHTML='<h4>Criteria extracted by AI</h4><p>'+escapeHtml(c.definition||"")+'</p><div class="extracted-rule-grid"><div><strong>Must have</strong>'+list(c.must_have)+'</div><div><strong>Positive signals</strong>'+list(c.strong_signals)+'</div><div><strong>Disqualifiers</strong>'+list(c.disqualifiers)+'</div><div><strong>Unknown information</strong><p>'+escapeHtml(c.unknown_handling||"Treated as unknown.")+'</p></div></div><p class="qualification-footnote">Threshold: '+escapeHtml(c.qualification_threshold||70)+'/100 · Profile version '+escapeHtml(event.profile_version)+'</p>';
-    }else if(event.type==="progress"){setStep(3);copyLabel.textContent="Assessing prospect fit, matching signals and missing information…";updateProgress(event.processed,event.total,event.qualified_count||0,event.not_qualified_count||0,event.failed_count||0);}
+    }else if(event.type==="progress"){setStep(3);copyLabel.textContent="Assessing prospect fit, matching signals and missing information…";updateProgress(event.processed,event.total,event.qualified_count||0,event.not_qualified_count||0,event.failed_count||0,event.needs_review_count||0);}
     else if(event.type==="complete"){finalResult=event.result;setStep(4);bar.style.width="100%";percentLabel.textContent="100%";countLabel.textContent=finalResult.checked+" of "+finalResult.source_lead_count+" leads assessed";copyLabel.textContent="Assessment complete. Your results have been saved.";stageLabel.textContent="Saving complete · "+finalResult.qualified_count+" qualified prospects";}
     else if(event.type==="error"){streamError=event.error||"Qualification failed.";}
    };
@@ -323,7 +323,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    const rejected=(d.not_qualified||[]).map(x=>'<li><strong>'+escapeHtml(x.name||"Lead")+'</strong> · '+escapeHtml(x.fit_score)+'/100 — '+escapeHtml(x.summary||"Did not meet the criteria")+'</li>').join("");
    const review=(d.needs_review||[]).map(x=>'<li><strong>'+escapeHtml(x.name||"Lead")+'</strong> · '+escapeHtml(x.fit_score)+'/100 — '+escapeHtml(x.summary||"More information is needed")+"</li>").join("");
    const failed=(d.errors||[]).map(x=>'<li><strong>'+escapeHtml(x.name||x.lead_id||"Lead")+'</strong>: '+escapeHtml(x.error||"Unknown error")+'</li>').join("");
-   summary.innerHTML=stats+'<p>Source database: '+escapeHtml(d.source_lead_count??d.checked)+' Lead Records · Model: '+escapeHtml(d.model||"Gemini")+'</p>'+(d.qualified_count?'<p>Qualified leads were saved to the separate database.</p>':'<p>No leads met the rules this time. The breakdown below explains why.</p>')+(review?'<details open><summary>Needs human review ('+(d.needs_review_count||0)+'</summary><ul>'+review+'</ul></details>':"")+(rejected?'<details open><summary>Unqualified ('+d.not_qualified_count+')</summary><ul>'+rejected+'</ul></details>':"")+(failed?'<details open><summary>Failed assessments ('+d.failed_count+')</summary><ul>'+failed+'</ul></details>':"");
+   summary.innerHTML=stats+'<p>Source database: '+escapeHtml(d.source_lead_count??d.checked)+' Lead Records · Model: '+escapeHtml(d.model||"Gemini")+'</p>'+(d.qualified_count?'<p>Qualified leads were saved to the separate database.</p>':'<p>No leads were confidently qualified. Check Needs Review before treating any prospect as unsuitable.</p>')+(review?'<details open><summary>Needs human review ('+(d.needs_review_count||0)+'</summary><ul>'+review+'</ul></details>':"")+(rejected?'<details open><summary>Unqualified ('+d.not_qualified_count+')</summary><ul>'+rejected+'</ul></details>':"")+(failed?'<details open><summary>Failed assessments ('+d.failed_count+')</summary><ul>'+failed+'</ul></details>':"");
    status.textContent="Qualification finished: "+d.checked+" records checked.";await loadSalesLeads();await loadQualifiedLeads();await loadReviewLeads();await loadUnqualifiedLeads();await loadSalesPipeline();
   }catch(err){status.textContent=err.message;summary.innerHTML='<p class="qualification-error">'+escapeHtml(err.message)+'</p>';}finally{clearInterval(progressTimer);clearInterval(insightTimer);overlay.classList.add("qualification-loading-finished");setTimeout(()=>overlay.remove(),900);b.disabled=false;b.innerHTML='Qualify Leads <span>✦</span>';}
  }
