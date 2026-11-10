@@ -312,7 +312,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   try{
    const r=await fetch("/api/sales/outreach/send",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_ids:selected})});
    const d=await r.json();
-   if(!r.ok&&!d.sent?.length){const detail=d.error||d.message||(Array.isArray(d.skipped)&&d.skipped.map(item=>item.reason).filter(Boolean).join(" "))||(Array.isArray(d.failed)&&d.failed.map(item=>item.reason).filter(Boolean).join(" "));throw new Error(detail||"The email service rejected the request without providing a reason. No email was confirmed as sent.");}
+   if(!r.ok&&!d.sent?.length){const detail=(Array.isArray(d.skipped)&&d.skipped.map(item=>item.reason).filter(Boolean).join(" "))||(Array.isArray(d.failed)&&d.failed.map(item=>item.reason).filter(Boolean).join(" "))||d.error||d.message;throw new Error(detail||"The email service rejected the request without providing a reason. No email was confirmed as sent.");}
    const sent=Array.isArray(d.sent)?d.sent:[],failed=Array.isArray(d.failed)?d.failed:[],skipped=Array.isArray(d.skipped)?d.skipped:[];
    const cards=sent.map(item=>'<article class="sales-email-draft-card"><strong>'+escapeHtml(item.name||"Lead")+'</strong><p><strong>To:</strong> '+escapeHtml(item.recipient||"")+'</p><p><strong>Subject:</strong> '+escapeHtml(item.subject||"")+'</p><span class="status-tag">SENT · GMAIL CONFIRMED</span></article>');
    const issues=[...failed.map(item=>({label:"Not sent",item})),...skipped.map(item=>({label:"Skipped",item}))];
