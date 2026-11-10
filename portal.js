@@ -149,7 +149,7 @@ async function loadUnqualifiedLeads(){
 async function loadReviewLeads(){
  const count=document.getElementById("reviewLeadCount"),host=document.getElementById("reviewLeadTable");if(!host)return;count.textContent="Loading leads for review…";
  try{const r=await fetch("/api/sales/review-leads",{credentials:"same-origin",cache:"no-store"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load leads for review.");const rows=d.review_leads||[];count.textContent=rows.length+" lead"+(rows.length===1?"":"s")+" need human review";
- host.innerHTML=rows.length?'<table class="sales-lead-table"><thead><tr><th>Prospect</th><th>Company</th><th>Contact</th><th>Fit score</th><th>Why review?</th><th>Next step</th><th>Decision</th></tr></thead><tbody>'+rows.map(v=>'<tr><td><strong>'+escapeHtml(v.first_name+" "+(v.last_name||""))+'</strong><small>'+escapeHtml(v.job_title||"")+'</small></td><td>'+escapeHtml(v.company||"—")+'</td><td>'+escapeHtml(v.email||v.phone||"—")+'</td><td>'+Number(v.fit_score||0)+'/100</td><td>'+escapeHtml(v.qualification_summary||"More information is needed")+(v.customer_need?'<small>Need: '+escapeHtml(v.customer_need)+'</small>':'<small>Customer need not yet established</small>')+'</td><td>'+escapeHtml((()=>{try{return JSON.parse(v.qualification_json||"{}").recommended_next_action||"Contact or research to establish needs"}catch{return "Contact or research to establish needs"}})())+'</td><td><button class="text-action approve-review-lead-button" type="button" data-lead-id="'+escapeHtml(v.lead_id)+'">Approve &amp; Move to Qualified</button></td></tr>').join("")+'</tbody></table>':'<div class="sales-empty-state">No leads currently need review.</div>';
+ host.innerHTML=rows.length?'<table class="sales-lead-table"><thead><tr><th>Prospect</th><th>Company</th><th>Contact</th><th>Fit score</th><th>Why review?</th><th>Next step</th><th>Decision</th></tr></thead><tbody>'+rows.map(v=>'<tr><td><strong>'+escapeHtml(v.first_name+" "+(v.last_name||""))+'</strong><small>'+escapeHtml(v.job_title||"")+'</small></td><td>'+escapeHtml(v.company||"—")+'</td><td>'+escapeHtml(v.email||v.phone||"—")+'</td><td>'+Number(v.fit_score||0)+'/100</td><td>'+escapeHtml(v.qualification_summary||"More information is needed")+(v.customer_need?'<small>Need: '+escapeHtml(v.customer_need)+'</small>':'<small>Customer need not yet established</small>')+'</td><td>'+escapeHtml((()=>{try{return JSON.parse(v.qualification_json||"{}").recommended_next_action||"Contact or research to establish needs"}catch{return "Contact or research to establish needs"}})())+'</td><td><button class="text-action approve-review-lead-button" type="button" data-lead-id="'+escapeHtml(v.lead_id)+'">Approve &amp; Move to Qualified</button><button class="text-action reject-review-lead-button" type="button" data-lead-id="'+escapeHtml(v.lead_id)+'">Reject &amp; Move to Unqualified</button></td></tr>').join("")+'</tbody></table>':'<div class="sales-empty-state">No leads currently need review.</div>';
  }catch(e){count.textContent="Unable to load review leads";host.textContent=e.message;}
 }
 async function loadQualificationProfile(){
@@ -182,6 +182,20 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    if(d.success!==true)throw new Error(d.error||"The server did not confirm approval.");
    await loadReviewLeads();await loadQualifiedLeads();await loadUnqualifiedLeads();await loadSalesPipeline();
   }catch(error){approveReviewButton.disabled=false;approveReviewButton.textContent="Approve & Move to Qualified";if(count)count.textContent=error.message;}
+  return;
+ }
+ const rejectReviewButton=e.target.closest(".reject-review-lead-button");
+ if(rejectReviewButton){
+  const leadId=rejectReviewButton.dataset.leadId;
+  rejectReviewButton.disabled=true;rejectReviewButton.textContent="Rejecting…";
+  const count=document.getElementById("reviewLeadCount");
+  try{
+   const r=await fetch("/api/sales/review-leads",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({action:"reject_unqualified",lead_id:leadId})});
+   const responseText=await r.text();let d={};try{d=responseText?JSON.parse(responseText):{};}catch{throw new Error("The server returned an unexpected response (HTTP "+r.status+"). Please refresh and try again.");}
+   if(!r.ok)throw new Error(d.error||"Could not reject this lead (HTTP "+r.status+").");
+   if(d.success!==true)throw new Error(d.error||"The server did not confirm rejection.");
+   await loadReviewLeads();await loadQualifiedLeads();await loadUnqualifiedLeads();await loadSalesPipeline();
+  }catch(error){rejectReviewButton.disabled=false;rejectReviewButton.textContent="Reject & Move to Unqualified";if(count)count.textContent=error.message;}
   return;
  }
  const meetingButton=e.target.closest(".meeting-decision-button");
