@@ -511,7 +511,7 @@ async function handleAdminMeetingDecision(request, env) {
   if(appointment.status!=="requested")return json({error:"This meeting request is no longer awaiting a decision."},409);
 
   if(decision==="decline"){
-    if(appointment.admin_accepted_at)return json({error:"The administrator has already accepted this time. It is awaiting the client's response."},409);
+    if(appointment.admin_accepted_at)return json({error:"The administrator has already approved the Calendar invitation."},409);
     const now=new Date().toISOString();
     const changed=await env.DB.prepare("UPDATE sales_appointments SET status='cancelled',admin_declined_at=?,updated_at=? WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NULL").bind(now,now,id,org).run();
     if(!changed.meta||changed.meta.changes!==1)return json({error:"The meeting changed while you were responding. Refresh and check its status."},409);
@@ -532,42 +532,68 @@ async function handleAdminMeetingDecision(request, env) {
   const lock=await env.DB.prepare("UPDATE sales_appointments SET admin_accepted_at=?,updated_at=? WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NULL").bind(now,now,id,org).run();
   if(!lock.meta||lock.meta.changes!==1)return json({error:"This meeting has already been approved or changed. Refresh the meeting list."},409);
 
-  const accept=await meetingToken(),decline=await meetingToken();
-  const expires=new Date(Date.now()+48*60*60*1000).toISOString();
-  let emailDelivered=false;
   try{
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM sales_appointment_tokens WHERE appointment_id=? AND organisation_id=? AND used_at IS NULL").bind(id,org),
-      env.DB.prepare("INSERT INTO sales_appointment_tokens (id,organisation_id,appointment_id,token_hash,purpose,expires_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),org,id,await meetingTokenHash(accept),"client_accept",expires),
-      env.DB.prepare("INSERT INTO sales_appointment_tokens (id,organisation_id,appointment_id,token_hash,purpose,expires_at) VALUES (?,?,?,?,?,?)").bind(crypto.randomUUID(),org,id,await meetingTokenHash(decline),"client_decline",expires)
-    ]);
-    const origin="https://donninger-ai.tovidonninger.workers.dev";
-    await sendMeetingEmail(env,{
-      action:"send_meeting_confirmation_email",
+    // Admin approval creates the actual Google Calendar event and sends its
+    // official guest invitation. The lead's Calendar RSVP determines final status.
+    const booking=await sendMeetingEmail(env,{
+      action:"book_sales_meeting",
+      appointment_id:id,
       email:appointment.email,
       name:[appointment.first_name,appointment.last_name].filter(Boolean).join(" ")||"there",
+      company:appointment.company||"",
       meeting_time:start.toISOString(),
       timezone:timezone,
-      confirm_url:origin+"/meeting/respond?token="+encodeURIComponent(accept),
-      decline_url:origin+"/meeting/respond?token="+encodeURIComponent(decline)
+      duration_minutes:Number(appointment.duration_minutes||30),
+      summary:appointment.discussion_summary||"",
+      admin_approved:true
     });
-    emailDelivered=true;
+    if(booking.booked!==true)throw new Error(booking.message||"Google Calendar did not confirm the invitation.");
+    const sentAt=new Date().toISOString();
     await env.DB.batch([
-      env.DB.prepare("UPDATE sales_appointments SET confirmation_email_sent_at=?,updated_at=? WHERE id=? AND organisation_id=? AND admin_accepted_at IS NOT NULL").bind(new Date().toISOString(),new Date().toISOString(),id,org),
-      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_admin_accepted',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,requested_start_at:start.toISOString(),client_email_sent:true}),auth.session.email)
+      env.DB.prepare("UPDATE sales_appointments SET confirmation_email_sent_at=?,updated_at=? WHERE id=? AND organisation_id=? AND admin_accepted_at IS NOT NULL AND status='requested'").bind(sentAt,sentAt,id,org),
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_calendar_invitation_sent',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,calendar_event_id:booking.event_id,guest_email:appointment.email,requested_start_at:start.toISOString(),timezone:timezone}),auth.session.email)
     ]);
-    return json({success:true,status:"awaiting_client",email_sent:true,message:"Administrator approval recorded and the client confirmation email was sent."});
+    return json({success:true,status:"awaiting_client",invite_sent:true,event_id:booking.event_id,message:"Your approval is recorded and the official Google Calendar invitation has been sent. The meeting will be confirmed when the lead accepts it in Google Calendar."});
   }catch(error){
-    console.error("Meeting confirmation processing failed:",error);
-    if(emailDelivered){
-      return json({success:true,status:"awaiting_client",email_sent:true,message:"The client confirmation email was sent. The meeting remains open for the client's response; an activity-log update needs attention."});
-    }
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM sales_appointment_tokens WHERE appointment_id=? AND organisation_id=? AND used_at IS NULL").bind(id,org),
-      env.DB.prepare("UPDATE sales_appointments SET admin_accepted_at=NULL,confirmation_email_sent_at=NULL,updated_at=? WHERE id=? AND organisation_id=? AND status='requested'").bind(new Date().toISOString(),id,org)
-    ]);
-    return json({success:false,email_sent:false,error:"The client confirmation email could not be sent. The meeting remains pending so you can retry. "+String(error.message||error).slice(0,180)},502);
+    console.error("Google Calendar invitation creation failed:",error);
+    await env.DB.prepare("UPDATE sales_appointments SET admin_accepted_at=NULL,confirmation_email_sent_at=NULL,updated_at=? WHERE id=? AND organisation_id=? AND status='requested'").bind(new Date().toISOString(),id,org).run();
+    return json({success:false,invite_sent:false,error:"The Google Calendar invitation could not be created. The meeting remains pending so you can retry. "+String(error.message||error).slice(0,180)},502);
   }
+}
+
+async function handleCalendarRsvp(request,env){
+  if(request.method!=="POST")return json({error:"Method not allowed."},405,{allow:"POST"});
+  if(!env.DONNINGER_EMAIL_TOKEN)return json({error:"Calendar RSVP sync is not configured."},503);
+  let body;try{body=await request.json();}catch{return json({error:"Invalid JSON."},400);}
+  if(!constantTimeEqual(String(body.token||""),env.DONNINGER_EMAIL_TOKEN))return json({error:"Unauthorised."},401);
+  const id=String(body.appointment_id||"").trim();
+  const email=String(body.email||"").trim().toLowerCase();
+  const rsvp=String(body.rsvp_status||"").trim().toLowerCase();
+  if(!id||!email||!["accepted","declined","tentative","invited"].includes(rsvp))return json({error:"A valid appointment, guest email and RSVP status are required."},400);
+  const org="dev-donninger";
+  const appointment=await env.DB.prepare("SELECT a.id,a.lead_id,a.status,a.admin_accepted_at,l.email FROM sales_appointments a JOIN leads l ON l.id=a.lead_id WHERE a.id=? AND a.organisation_id=?").bind(id,org).first();
+  if(!appointment||String(appointment.email||"").toLowerCase()!==email)return json({error:"The appointment or guest email could not be verified."},404);
+  if(!appointment.admin_accepted_at)return json({error:"The administrator has not approved this meeting."},409);
+  if(appointment.status==="confirmed"&&rsvp==="accepted")return json({success:true,duplicate:true,status:"confirmed"});
+  if(appointment.status!=="requested")return json({success:true,ignored:true,status:appointment.status});
+  const now=new Date().toISOString();
+  if(rsvp==="accepted"){
+    const changed=await env.DB.prepare("UPDATE sales_appointments SET status='confirmed',prospect_accepted_at=COALESCE(prospect_accepted_at,?),confirmed_start_at=requested_start_at,updated_at=? WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NOT NULL").bind(now,now,id,org).run();
+    if(!changed.meta||changed.meta.changes!==1)return json({error:"The appointment changed before the RSVP could be recorded."},409);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE leads SET pipeline_stage='meeting_confirmed',status='proposal',updated_at=? WHERE id=? AND organisation_id=?").bind(now,appointment.lead_id,org),
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_client_accepted',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,response:"accepted",source:"Google Calendar RSVP"}),"Google Calendar")
+    ]);
+    return json({success:true,status:"confirmed",rsvp_status:"accepted"});
+  }
+  if(rsvp==="declined"){
+    await env.DB.batch([
+      env.DB.prepare("UPDATE sales_appointments SET status='cancelled',client_declined_at=?,updated_at=? WHERE id=? AND organisation_id=? AND status='requested'").bind(now,now,id,org),
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_client_declined',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,response:"declined",source:"Google Calendar RSVP"}),"Google Calendar")
+    ]);
+    return json({success:true,status:"cancelled",rsvp_status:"declined"});
+  }
+  return json({success:true,status:"awaiting_client",rsvp_status:rsvp});
 }
 async function handleClientMeetingResponse(request,env) {
   const url=new URL(request.url);
@@ -1075,6 +1101,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/unqualified-leads") return handleUnqualifiedLeads(request, env);
   if (url.pathname === "/api/sales/review-leads") return handleReviewLeads(request, env);
   if (url.pathname === "/api/sales/appointments/respond") return handleAdminMeetingDecision(request, env);
+  if (url.pathname === "/api/sales/calendar-rsvp") return handleCalendarRsvp(request, env);
   if (url.pathname === "/api/sales/appointments") return handleSalesAppointments(request, env);
   if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
   if (url.pathname === "/api/sales/email-history") return handleSalesEmailHistory(request, env);
