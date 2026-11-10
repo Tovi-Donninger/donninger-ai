@@ -688,6 +688,7 @@ async function handleSalesPipeline(request, env) {
   if (auth.error) return auth.error;
   const org = 'dev-donninger';
   if (request.method === 'GET') {
+    await env.DB.prepare("UPDATE leads SET pipeline_stage='contacted',status='contacted',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND pipeline_stage IN ('qualified','new') AND EXISTS (SELECT 1 FROM sales_messages m WHERE m.organisation_id=leads.organisation_id AND m.lead_id=leads.id AND m.direction='outbound' AND m.channel='email' AND m.status='sent')").bind(org).run();
     const rows = await env.DB.prepare("SELECT l.id AS lead_id,l.first_name,l.last_name,l.email,l.phone,l.company,l.job_title,l.customer_need,l.pipeline_stage,l.contact_permission,l.updated_at,q.fit_score,q.priority,q.qualification_summary FROM leads l LEFT JOIN qualified_leads q ON q.lead_id=l.id AND q.organisation_id=l.organisation_id WHERE l.organisation_id=? AND l.pipeline_stage IN ('contacted','meeting_requested','meeting_confirmed','meeting_completed','converted','lost') ORDER BY l.updated_at DESC LIMIT 300").bind(org).all();
     return json({ pipeline_leads: rows.results || [] });
   }
