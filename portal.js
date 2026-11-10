@@ -306,15 +306,14 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   const button=document.getElementById("contactQualifiedLeads"),composer=document.getElementById("salesOutreachComposer"),status=document.getElementById("salesOutreachStatus"),list=document.getElementById("salesOutreachDraftList");
   if(!button||!composer||!status||!list)return;
   const selected=[...document.querySelectorAll(".qualified-lead-select:checked")].map(box=>box.dataset.leadId).filter(Boolean);
-  if(!selected.length){status.textContent="Select at least one qualified lead first.";composer.hidden=false;return;}
-  if(selected.length>10){status.textContent="Please select no more than 10 leads at a time.";composer.hidden=false;return;}
-  button.disabled=true;composer.hidden=false;list.innerHTML="";status.textContent="Preparing an individual email for each selected lead…";
+  if(!selected.length){status.textContent="Select James Wilson first.";composer.hidden=false;return;}
+  if(selected.length!==1){status.textContent="For this first live-email test, select James Wilson only. Other recipients remain blocked.";composer.hidden=false;return;}
+  button.disabled=true;composer.hidden=false;list.innerHTML="";status.textContent="Preparing James Wilson's personalised email and sending it through Gmail…";
   try{
-   const r=await fetch("/api/sales/outreach/drafts",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_ids:selected})});
-   const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not prepare the email drafts.");
-   list.innerHTML=(d.drafts||[]).map(draft=>'<article class="sales-email-draft-card" data-message-id="'+escapeHtml(draft.message_id)+'"><div class="sales-draft-heading"><strong>'+escapeHtml(draft.name)+'</strong><span>'+escapeHtml(draft.company||"")+'</span></div><p><strong>To:</strong> '+escapeHtml(draft.recipient)+' · Fit '+escapeHtml(draft.fit_score)+'/100</p><label>Subject<input class="sales-draft-subject" maxlength="200" value="'+escapeHtml(draft.subject)+'"></label><label>Email message<textarea class="sales-draft-body" rows="9" maxlength="8000">'+escapeHtml(draft.body)+'</textarea></label><span class="status-tag">SAVED DRAFT · NOT SENT</span></article>').join("")||'<p>No drafts could be created.</p>';
-   status.textContent=d.message+(d.skipped?.length?" Skipped: "+(d.skipped||[]).map(x=>x.reason).join(" · "):"");
-   composer.scrollIntoView({behavior:"smooth",block:"nearest"});
+   const r=await fetch("/api/sales/outreach/send",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_ids:selected})});
+   const d=await r.json();if(!r.ok||d.success!==true)throw new Error(d.error||"Gmail did not confirm the email send.");
+   list.innerHTML='<article class="sales-email-draft-card"><strong>'+escapeHtml(d.name)+'</strong><p><strong>To:</strong> '+escapeHtml(d.recipient)+'</p><p><strong>Subject:</strong> '+escapeHtml(d.subject)+'</p><span class="status-tag">SENT · GMAIL CONFIRMED</span></article>';
+   status.textContent=d.message||"Test email sent.";composer.scrollIntoView({behavior:"smooth",block:"nearest"});
   }catch(error){status.textContent=error.message;}
   finally{button.disabled=false;}
  }
