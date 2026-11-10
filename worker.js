@@ -426,6 +426,27 @@ async function handleReviewLeads(request,env){
  if(request.method==="POST"){
   let body;try{body=await request.json();}catch{return json({error:"Invalid request."},400);}
   const leadId=String(body.lead_id||"").trim();if(!leadId||leadId.length>200)return json({error:"A valid lead ID is required."},400);
+  if(body.action==="reject_unqualified"){
+   const lead=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=? AND pipeline_stage='needs_review'").bind(leadId,org).first();
+   if(!lead)return json({error:"This lead is no longer in Needs Review. Refresh the table and try again."},404);
+   const run=await env.DB.prepare("SELECT id,fit_score,priority,result_json FROM sales_qualification_runs WHERE organisation_id=? AND lead_id=? AND status='completed' ORDER BY completed_at DESC LIMIT 1").bind(org,leadId).first();
+   if(!run)return json({error:"No completed qualification assessment was found for this lead."},409);
+   let result={};try{result=JSON.parse(run.result_json||"{}");}catch{return json({error:"The qualification assessment could not be read. The lead was not moved."},500);}
+   const summary=String(result.summary||"Rejected after human review");
+   try{
+    await env.DB.batch([
+     env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,leadId),
+     env.DB.prepare("INSERT INTO unqualified_leads (id,organisation_id,lead_id,qualification_run_id,fit_score,qualification_summary,qualification_json) VALUES (?,?,?,?,?,?,?) ON CONFLICT(organisation_id,lead_id) DO UPDATE SET qualification_run_id=excluded.qualification_run_id,fit_score=excluded.fit_score,qualification_summary=excluded.qualification_summary,qualification_json=excluded.qualification_json,assessed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(crypto.randomUUID(),org,leadId,run.id,Number(run.fit_score)||0,summary,JSON.stringify(result)),
+     env.DB.prepare("UPDATE leads SET status='lost',pipeline_stage='unqualified',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND pipeline_stage='needs_review'").bind(org,leadId),
+     env.DB.prepare("UPDATE sales_qualification_runs SET reviewed_by=?,reviewed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),result_json=json_set(result_json,'$.human_review','rejected') WHERE id=? AND organisation_id=?").bind(auth.session.email,run.id,org),
+     env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'lead_rejected_after_review',?,?)").bind(crypto.randomUUID(),org,leadId,JSON.stringify({qualification_run_id:run.id,decision:"rejected"}),auth.session.email)
+    ]);
+    return json({success:true,message:"Lead rejected and moved to Unqualified Leads."});
+   }catch(error){
+    console.error("Reject reviewed lead failed:",error);
+    return json({error:"Database error while rejecting lead: "+String(error?.message||"Unknown error").slice(0,350)},500);
+   }
+  }
   if(body.action==="approve_qualified"){
    const lead=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=? AND pipeline_stage='needs_review'").bind(leadId,org).first();
    if(!lead)return json({error:"This lead is no longer in Needs Review. Refresh the table and try again."},404);
