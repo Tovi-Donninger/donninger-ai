@@ -777,8 +777,7 @@ async function handleSalesOutreachDrafts(request, env) {
       } catch(error){lastError=String(error.message||error);}
     }
     if(!draft||!String(draft.subject||"").trim()||!String(draft.body||"").trim()){skipped.push({lead_id:leadId,reason:"AI could not prepare a valid draft. "+lastError});continue;}
-    const companyName=String(lead.company||"").replace(/[\\r\\n\\t]/g," ").replace(/\\s+/g," ").trim().slice(0,90);
-    const subject=companyName ? "A quick question about automation at "+companyName : "A quick question about business automation";
+    const subject="A quick question about business automation";
     const messageId=crypto.randomUUID(),message=String(draft.body).trim().slice(0,8000);
     await env.DB.prepare("INSERT INTO sales_messages (id,organisation_id,lead_id,direction,channel,subject,body,status,approval_status,recipient,sender,provider,consent_basis_snapshot,ai_generated,ai_prompt_version,created_by) VALUES (?,?,?,'outbound','email',?,?,'draft','pending',?,'donninger.ai.support@gmail.com','gmail',?,1,'sales-outreach-v1',?)").bind(messageId,org,lead.id,subject,message,lead.email,lead.contact_permission,auth.session.email).run();
     await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_email_draft_created',?,?)").bind(crypto.randomUUID(),org,lead.id,JSON.stringify({message_id:messageId,recipient:lead.email,subject,approval_status:"pending"}),auth.session.email).run();
