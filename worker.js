@@ -132,7 +132,7 @@ async function handleSalesLeads(request, env) {
     const source = String(body.source || "manual").trim().slice(0, 80);
     const contactPermission = ["unknown","consent_given","existing_customer_basis","legitimate_interest_reviewed","do_not_contact"].includes(body.contact_permission) ? body.contact_permission : "unknown";
     if (!firstName) return json({ error: "First name is required." }, 400);
-    if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: "Enter a valid email address." }, 400);
     const id = crypto.randomUUID();
     await env.DB.prepare(
       "INSERT INTO leads (id, organisation_id, first_name, last_name, email, phone, company, job_title, source, customer_need, contact_permission) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
