@@ -112,10 +112,31 @@ async function handleSalesLeads(request, env) {
   if (auth.error) return auth.error;
   const organisationId = "dev-donninger";
   if (request.method === "GET") {
+    const leadId = new URL(request.url).searchParams.get("id");
+    if (leadId) {
+      const lead = await env.DB.prepare("SELECT id,first_name,last_name,email,phone,company,job_title,source,customer_need,status,priority,contact_permission,pipeline_stage FROM leads WHERE id=? AND organisation_id=?").bind(leadId,organisationId).first();
+      if (!lead) return json({ error: "Lead not found." }, 404);
+      return json({ lead });
+    }
     const result = await env.DB.prepare(
       "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, created_at, updated_at FROM leads WHERE organisation_id = ? AND status = 'new' AND pipeline_stage = 'new' ORDER BY created_at DESC LIMIT 200"
     ).bind(organisationId).all();
     return json({ leads: result.results || [] });
+  }
+  if (request.method === "PUT") {
+    const length = Number(request.headers.get("content-length") || 0);
+    if (length > 20000) return json({ error: "Lead details are too large." }, 413);
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "Invalid JSON request." }, 400); }
+    const leadId=String(body.id||"").trim(),firstName=String(body.first_name||"").trim().slice(0,100),lastName=String(body.last_name||"").trim().slice(0,100),email=String(body.email||"").trim().slice(0,254),phone=String(body.phone||"").trim().slice(0,40),company=String(body.company||"").trim().slice(0,160),jobTitle=String(body.job_title||"").trim().slice(0,120),customerNeed=String(body.customer_need||"").trim().slice(0,2000),contactPermission=["unknown","consent_given","existing_customer_basis","legitimate_interest_reviewed","do_not_contact"].includes(body.contact_permission)?body.contact_permission:"unknown";
+    if(!leadId)return json({error:"Lead ID is required."},400);
+    if(!firstName)return json({error:"First name is required."},400);
+    if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return json({error:"Enter a valid email address."},400);
+    const existing=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=?").bind(leadId,organisationId).first();
+    if(!existing)return json({error:"Lead not found."},404);
+    await env.DB.prepare("UPDATE leads SET first_name=?,last_name=?,email=?,phone=?,company=?,job_title=?,customer_need=?,contact_permission=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?").bind(firstName,lastName,email,phone,company,jobTitle,customerNeed,contactPermission,leadId,organisationId).run();
+    await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'lead_updated',?,?)").bind(crypto.randomUUID(),organisationId,leadId,JSON.stringify({fields_updated:["first_name","last_name","email","phone","company","job_title","customer_need","contact_permission"]}),auth.session.email).run();
+    return json({success:true,lead_id:leadId});
   }
   if (request.method === "POST") {
     const length = Number(request.headers.get("content-length") || 0);
@@ -142,7 +163,7 @@ async function handleSalesLeads(request, env) {
     ).bind(crypto.randomUUID(), organisationId, id, JSON.stringify({ source }), auth.session.email).run();
     return json({ success: true, lead: { id, first_name: firstName, last_name: lastName, email, phone, company, job_title: jobTitle, source, customer_need: customerNeed, status: "new", contact_permission: contactPermission } }, 201);
   }
-  return json({ error: "Method not allowed." }, 405, { allow: "GET, POST" });
+  return json({ error: "Method not allowed." }, 405, { allow: "GET, POST, PUT" });
 }
 async function handleDonningerTestLead(request, env) {
   const auth = await requireAdmin(request, env);
