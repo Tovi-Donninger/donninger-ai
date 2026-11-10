@@ -781,7 +781,9 @@ async function handleSalesOutreachDrafts(request, env) {
     const validCompanyName=/^[\\p{L}\\p{N}][\\p{L}\\p{N}&'’.,()\\-]*(?:\\s+[\\p{L}\\p{N}][\\p{L}\\p{N}&'’.,()\\-]*)*$/u.test(rawCompanyName);
     const companyName=validCompanyName?rawCompanyName:"your business";
     const subject="An Introduction – Exploring Opportunities with "+companyName;
-    const messageId=crypto.randomUUID(),message=String(draft.body).trim().slice(0,8000);
+    const messageId=crypto.randomUUID();
+    const emailBody=String(draft.body).trim().replace(/\n{1,3}(?:Kind regards|Best regards|Regards|Sincerely),?\s*\n(?:Donninger\.AI)?\s*$/i, "").trim();
+    const message=(emailBody+"\n\nKind regards,\nTovi Donninger\nFounder, Donninger.AI").slice(0,8000);
     await env.DB.prepare("INSERT INTO sales_messages (id,organisation_id,lead_id,direction,channel,subject,body,status,approval_status,recipient,sender,provider,consent_basis_snapshot,ai_generated,ai_prompt_version,created_by) VALUES (?,?,?,'outbound','email',?,?,'draft','pending',?,'donninger.ai.support@gmail.com','gmail',?,1,'sales-outreach-v1',?)").bind(messageId,org,lead.id,subject,message,lead.email,lead.contact_permission,auth.session.email).run();
     await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_email_draft_created',?,?)").bind(crypto.randomUUID(),org,lead.id,JSON.stringify({message_id:messageId,recipient:lead.email,subject,approval_status:"pending"}),auth.session.email).run();
     drafts.push({message_id:messageId,lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),company:lead.company,recipient:lead.email,subject,body:message,fit_score:lead.fit_score});
