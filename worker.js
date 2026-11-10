@@ -428,11 +428,16 @@ async function handleReviewLeads(request,env){
   const leadId=String(body.lead_id||"").trim();if(!leadId||leadId.length>200)return json({error:"A valid lead ID is required."},400);
   const lead=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=? AND status='lost'").bind(leadId,org).first();
   if(!lead)return json({error:"This unqualified lead could not be found. Refresh the table and try again."},404);
-  await env.DB.batch([
-   env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,leadId),
-   env.DB.prepare("UPDATE leads SET status='review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='lost'").bind(org,leadId)
-  ]);
-  return json({success:true,message:"Lead moved to Needs Review."});
+  try {
+   await env.DB.batch([
+    env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,leadId),
+    env.DB.prepare("UPDATE leads SET status='review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='lost'").bind(org,leadId)
+   ]);
+   return json({success:true,message:"Lead moved to Needs Review."});
+  } catch(error) {
+   console.error("Move lead to review failed:",error);
+   return json({error:"The lead could not be moved because the database operation failed. Please refresh and try again."},500);
+  }
  }
  return json({error:"Method not allowed."},405,{allow:"GET, POST"});
 }
