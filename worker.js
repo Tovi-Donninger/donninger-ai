@@ -778,101 +778,41 @@ async function handleSalesEmailHistory(request, env) {
     activities: activities.results || []
   });
 }
-async function handleSalesContactTestLead(request, env) {
+async function handleSalesOutreachDrafts(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
   if (!env.GEMINI_API_KEY) return json({ error: "AI email drafting is not connected. Add the GEMINI_API_KEY Worker secret." }, 503);
-  if (!env.DONNINGER_EMAIL_TOKEN) return json({ error: "Email service is not configured. Add the DONNINGER_EMAIL_TOKEN Worker secret." }, 503);
-
   let body;
   try { body = await request.json(); } catch { return json({ error: "Invalid request." }, 400); }
-  const action = String(body.action || "");
-  if (!["draft", "send"].includes(action)) return json({ error: "Choose draft or send." }, 400);
-
-  const lead = await env.DB.prepare(
-    "SELECT l.id,l.first_name,l.last_name,l.email,l.company,l.job_title,l.customer_need,l.source,l.contact_permission,q.fit_score,q.priority,q.qualification_summary,q.qualification_json FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.organisation_id=? AND lower(l.email)=lower(?) AND l.source=? AND l.contact_permission='consent_given' ORDER BY q.qualified_at DESC LIMIT 1"
-  ).bind("dev-donninger", "dev-donninger", "tovidonninger@gmail.com", "donninger_ai_self_test").first();
-
-  if (!lead) {
-    return json({ error: "Tovi's self-test lead has not been qualified yet. Add the test lead and run Qualify Leads first." }, 409);
-  }
-
-  if (action === "draft") {
-    const model = String(env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
-    const prompt = "Write a concise, genuinely personalised B2B sales email for the following authorised internal self-test prospect. The sender is Donninger.AI and the recipient is its own founder, Tovi Donninger, so make the email read as a realistic demonstration of how the platform could sell its services to a qualified prospect. Use the lead's actual stated needs and qualification evidence. Explain Donninger.AI's intended offer: business automation assessment, tailored automation recommendations, implementation/setup and ongoing maintenance/support. IMPORTANT: Donninger.AI is still a development project. Do not claim that all eight automation modules are live, that integrations are already connected, that customers have achieved results, or that any savings/profit improvement is guaranteed. Position this as an honest introduction to the platform and its test project. Do not invent facts, prices, results, testimonials or commitments. Friendly, confident, specific, not hype-heavy. Include a clear low-pressure call to action to discuss a short demonstration. Return only the requested JSON fields.\n\nLEAD AND QUALIFICATION DATA:\n" + JSON.stringify({
-      first_name: lead.first_name,
-      last_name: lead.last_name,
-      email: lead.email,
-      company: lead.company,
-      job_title: lead.job_title,
-      customer_need: lead.customer_need,
-      fit_score: lead.fit_score,
-      priority: lead.priority,
-      qualification_summary: lead.qualification_summary,
-      qualification_json: lead.qualification_json
-    });
-    const schema = { type: "OBJECT", properties: { subject: { type: "STRING" }, body: { type: "STRING" } }, required: ["subject", "body"] };
-    const models = [...new Set([model, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash"])];
-    let draft = null, lastError = null;
-    for (const candidate of models) {
+  const ids = [...new Set((Array.isArray(body.lead_ids) ? body.lead_ids : []).map(v => String(v || "").trim()).filter(Boolean))];
+  if (!ids.length || ids.length > 10) return json({ error: "Select between 1 and 10 qualified leads at a time." }, 400);
+  const org = "dev-donninger", drafts = [], skipped = [];
+  const model = String(env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
+  for (const leadId of ids) {
+    const lead = await env.DB.prepare("SELECT l.id,l.first_name,l.last_name,l.email,l.company,l.job_title,l.customer_need,l.contact_permission,q.fit_score,q.priority,q.qualification_summary,q.qualification_json FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.organisation_id=? AND l.id=? LIMIT 1").bind(org,org,leadId).first();
+    if (!lead) { skipped.push({lead_id:leadId,reason:"Lead is no longer in Qualified Leads."}); continue; }
+    if (!lead.email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(lead.email)) { skipped.push({lead_id:leadId,reason:"A valid email address is required."}); continue; }
+    if (lead.contact_permission !== "consent_given") { skipped.push({lead_id:leadId,reason:lead.contact_permission==="do_not_contact"?"This lead is marked Do Not Contact.":"Recorded email consent is required for this development outreach test."}); continue; }
+    const prompt = "Write one concise, individually personalised B2B introduction email from Donninger.AI to this qualified prospect. Use only supplied lead facts and qualification evidence. Do not invent facts about the prospect, company, products, prices, savings, results, integrations, testimonials or availability. Donninger.AI is still in development; describe its intended service honestly as helping businesses identify suitable automation opportunities and, where agreed, plan implementation and ongoing support. Do not claim the platform or all automations are already live. Use a natural, warm, professional tone, not mass-marketing language. Mention the prospect's recorded need specifically. End with one low-pressure question asking whether they would prefer a short introductory conversation or more information. Do not pretend to be a named human. Return JSON only.\\n\\nLEAD FACTS:\\n"+JSON.stringify({first_name:lead.first_name,last_name:lead.last_name,company:lead.company,job_title:lead.job_title,customer_need:lead.customer_need,fit_score:lead.fit_score,priority:lead.priority,qualification_summary:lead.qualification_summary,qualification_evidence:lead.qualification_json});
+    const schema={type:"OBJECT",properties:{subject:{type:"STRING"},body:{type:"STRING"}},required:["subject","body"]};
+    let draft=null,lastError="";
+    for(const candidate of [...new Set([model,"gemini-3.5-flash-lite","gemini-3.8-flash","gemini-3.5-flash"])]) {
       try {
-        const upstream = await fetch("https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(candidate) + ":generateContent?key=" + encodeURIComponent(env.GEMINI_API_KEY), {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: prompt }] }], generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.45, maxOutputTokens: 900 } })
-        });
-        const result = await upstream.json().catch(() => ({}));
-        if (!upstream.ok) {
-          lastError = "AI provider HTTP " + upstream.status;
-          if ([500, 502, 503].includes(upstream.status)) continue;
-          return json({ error: "The AI could not draft the email (" + lastError + ")." }, 502);
-        }
-        const output = result.candidates?.[0]?.content?.parts?.map(part => part.text || "").join("") || "";
-        draft = JSON.parse(output);
-        break;
-      } catch (error) {
-        lastError = String(error.message || error);
-        if (!/HTTP 50[023]/.test(lastError)) break;
-      }
+        const upstream=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(candidate)+":generateContent?key="+encodeURIComponent(env.GEMINI_API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,temperature:0.4,maxOutputTokens:700}})});
+        const result=await upstream.json().catch(()=>({}));
+        if(!upstream.ok){lastError="AI provider HTTP "+upstream.status;if([429,500,502,503].includes(upstream.status))continue;break;}
+        const output=result.candidates?.[0]?.content?.parts?.map(part=>part.text||"").join("")||"";
+        draft=JSON.parse(output);break;
+      } catch(error){lastError=String(error.message||error);}
     }
-    if (!draft || !String(draft.subject || "").trim() || !String(draft.body || "").trim()) {
-      console.error("Sales email draft failed:", lastError);
-      return json({ error: "The AI could not produce a valid email draft. Please try again." }, 502);
-    }
-    return json({ success: true, draft: { subject: String(draft.subject).slice(0, 200), body: String(draft.body).slice(0, 8000) }, recipient: lead.email, recipient_name: lead.first_name + " " + lead.last_name, fit_score: lead.fit_score, model: model });
+    if(!draft||!String(draft.subject||"").trim()||!String(draft.body||"").trim()){skipped.push({lead_id:leadId,reason:"AI could not prepare a valid draft. "+lastError});continue;}
+    const messageId=crypto.randomUUID(),subject=String(draft.subject).replace(/[\\r\\n]/g," ").trim().slice(0,200),message=String(draft.body).trim().slice(0,8000);
+    await env.DB.prepare("INSERT INTO sales_messages (id,organisation_id,lead_id,direction,channel,subject,body,status,approval_status,recipient,sender,provider,consent_basis_snapshot,ai_generated,ai_prompt_version,created_by) VALUES (?,?,?,'outbound','email',?,?,'draft','pending',?,'donninger.ai.support@gmail.com','gmail',?,1,'sales-outreach-v1',?)").bind(messageId,org,lead.id,subject,message,lead.email,lead.contact_permission,auth.session.email).run();
+    await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_email_draft_created',?,?)").bind(crypto.randomUUID(),org,lead.id,JSON.stringify({message_id:messageId,recipient:lead.email,subject,approval_status:"pending"}),auth.session.email).run();
+    drafts.push({message_id:messageId,lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),company:lead.company,recipient:lead.email,subject,body:message,fit_score:lead.fit_score});
   }
-
-  const email = String(body.email || "").trim().toLowerCase();
-  const subject = String(body.subject || "").replace(/[\\r\\n]/g, " ").trim();
-  const message = String(body.body || "").trim();
-  if (email !== "tovidonninger@gmail.com" || email !== String(lead.email || "").toLowerCase()) return json({ error: "The self-test can only send to Tovi's authorised test address." }, 403);
-  if (body.approved !== true) return json({ error: "Review and approve the email before sending." }, 403);
-  if (!subject || subject.length > 200 || !message || message.length > 8000) return json({ error: "The email subject or message is invalid." }, 400);
-
-  try {
-    const upstream = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: env.DONNINGER_EMAIL_TOKEN, action: "send_sales_test_email", email, subject, body: message, approved: true }),
-      redirect: "follow"
-    });
-    const text = await upstream.text();
-    let result;
-    try { result = JSON.parse(text); } catch { result = null; }
-    if (!upstream.ok || !result || result.success !== true) {
-      console.error("Apps Script sales email response:", upstream.status, text.slice(0, 500));
-      return json({ error: result?.message || "The email service did not confirm that the test email was sent." }, 502);
-    }
-    await env.DB.batch([
-      env.DB.prepare("UPDATE leads SET pipeline_stage='contacted',status='contacted',last_contacted_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?").bind(lead.id, "dev-donninger"),
-      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'sales_test_email_sent',?,?)").bind(crypto.randomUUID(), "dev-donninger", lead.id, JSON.stringify({ recipient: email, subject, approved: true, pipeline_stage: "contacted" }), auth.session.email)
-    ]);
-    return json({ success: true, message: "Your approved Donninger.AI test sales email was sent to " + email + "." });
-  } catch (error) {
-    console.error("Sales test email send failed:", error);
-    return json({ error: "The email service could not be reached. Please try again." }, 502);
-  }
+  return json({success:true,drafts,skipped,message:drafts.length+" personalised draft(s) created. Nothing has been sent."});
 }
 
 function cleanSalesEmailBody(value) {
@@ -1044,7 +984,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/appointments") return handleSalesAppointments(request, env);
   if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
   if (url.pathname === "/api/sales/email-history") return handleSalesEmailHistory(request, env);
-  if (url.pathname === "/api/sales/contact-test-lead") return handleSalesContactTestLead(request, env);
+  if (url.pathname === "/api/sales/outreach/drafts") return handleSalesOutreachDrafts(request, env);
   if (url.pathname === "/api/sales/email-reply") return handleSalesReplyIngest(request, env);
   if (url.pathname === "/api/auth/login" && request.method === "POST") {
     // Production founder/admin login. Credentials are Cloudflare Worker secrets,
