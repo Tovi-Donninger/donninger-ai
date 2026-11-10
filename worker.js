@@ -309,14 +309,14 @@ async function handleBulkLeadQualification(request,env){
  const leads=leadsResult.results||[];
  if(!leads.length)return json({error:"There are no imported leads to qualify yet."},400);
  const criteriaSchema={type:"OBJECT",properties:{definition:{type:"STRING"},must_have:{type:"ARRAY",items:{type:"STRING"}},strong_signals:{type:"ARRAY",items:{type:"STRING"}},disqualifiers:{type:"ARRAY",items:{type:"STRING"}},unknown_handling:{type:"STRING"},qualification_threshold:{type:"INTEGER"}},required:["definition","must_have","strong_signals","disqualifiers","unknown_handling","qualification_threshold"]};
- const assessmentSchema={type:"OBJECT",properties:{lead_id:{type:"STRING"},fit_score:{type:"INTEGER"},priority:{type:"STRING",enum:["low","medium","high"]},confidence:{type:"NUMBER"},qualified:{type:"BOOLEAN"},summary:{type:"STRING"},matched_criteria:{type:"ARRAY",items:{type:"STRING"}},gaps:{type:"ARRAY",items:{type:"STRING"}},evidence:{type:"ARRAY",items:{type:"OBJECT",properties:{field:{type:"STRING"},observed:{type:"STRING"},relevance:{type:"STRING"}},required:["field","observed","relevance"]}},recommended_next_action:{type:"STRING"},purchase_intent:{type:"STRING",enum:["explicit","possible","not_stated"]}},required:["lead_id","fit_score","priority","confidence","qualified","summary","matched_criteria","gaps","evidence","recommended_next_action","purchase_intent"]};
+ const assessmentSchema={type:"OBJECT",properties:{lead_id:{type:"STRING"},fit_score:{type:"INTEGER"},priority:{type:"STRING",enum:["low","medium","high"]},confidence:{type:"NUMBER"},classification:{type:"STRING",enum:["qualified","needs_review","unqualified"]},qualified:{type:"BOOLEAN"},summary:{type:"STRING"},matched_criteria:{type:"ARRAY",items:{type:"STRING"}},gaps:{type:"ARRAY",items:{type:"STRING"}},evidence:{type:"ARRAY",items:{type:"OBJECT",properties:{field:{type:"STRING"},observed:{type:"STRING"},relevance:{type:"STRING"}},required:["field","observed","relevance"]}},recommended_next_action:{type:"STRING"},purchase_intent:{type:"STRING",enum:["explicit","possible","not_stated"]}},required:["lead_id","fit_score","priority","confidence","classification","qualified","summary","matched_criteria","gaps","evidence","recommended_next_action","purchase_intent"]};
  const batchSize=8,totalBatches=Math.ceil(leads.length/batchSize),encoder=new TextEncoder();
  let started=false;
  const stream=new ReadableStream({
   async pull(controller){
    if(started)return;started=true;
    const emit=event=>controller.enqueue(encoder.encode(JSON.stringify(event)+"\n"));
-   const qualified=[],notQualified=[],errors=[];
+   const qualified=[],needsReview=[],notQualified=[],errors=[];
    let criteria=null,profileId=null,version=1,processed=0;
    emit({type:"started",total:leads.length,batch_size:batchSize,total_batches:totalBatches,model});
    const callGemini=async(prompt,schema,maxTokens=8000)=>{
@@ -369,14 +369,21 @@ async function handleBulkLeadQualification(request,env){
       result.confidence=Math.max(0,Math.min(1,Number(result.confidence)||0));
       result.priority=["low","medium","high"].includes(result.priority)?result.priority:"low";
       const threshold=Math.max(0,Math.min(100,Number(criteria.qualification_threshold)||70));
-      result.qualified=result.qualified===true&&result.fit_score>=threshold;
+      result.classification=["qualified","needs_review","unqualified"].includes(result.classification)?result.classification:(result.qualified===true?"qualified":"needs_review");
+      if(result.classification==="qualified"&&(!result.qualified||result.fit_score<threshold))result.classification="needs_review";
+      result.qualified=result.classification==="qualified";
       const runId=crypto.randomUUID(),evidence=Array.isArray(result.evidence)?result.evidence.slice(0,10):[];
       statements.push(env.DB.prepare("INSERT INTO sales_qualification_runs (id,organisation_id,lead_id,profile_id,profile_version,status,priority,fit_score,confidence,result_json,evidence_json,model_name,prompt_version,completed_at) VALUES (?,?,?,?,?,'completed',?,?,?,?,?,?,'bulk-qualification-v2',strftime('%Y-%m-%dT%H:%M:%fZ','now'))").bind(runId,org,lead.id,profileId,version,result.priority,result.fit_score,result.confidence,JSON.stringify(result),JSON.stringify(evidence),model));
-      if(result.qualified){
+      if(result.classification==="qualified"){
        statements.push(env.DB.prepare("INSERT INTO qualified_leads (id,organisation_id,lead_id,qualification_run_id,fit_score,priority,qualification_summary,qualification_json) VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(organisation_id,lead_id) DO UPDATE SET qualification_run_id=excluded.qualification_run_id,fit_score=excluded.fit_score,priority=excluded.priority,qualification_summary=excluded.qualification_summary,qualification_json=excluded.qualification_json,qualified_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(crypto.randomUUID(),org,lead.id,runId,result.fit_score,result.priority,result.summary||"",JSON.stringify(result)));
        statements.push(env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
        statements.push(env.DB.prepare("UPDATE leads SET status='qualified',pipeline_stage='qualified',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
        qualified.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,priority:result.priority,summary:result.summary||"",result});
+      }else if(result.classification==="needs_review"){
+       statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
+       statements.push(env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
+       statements.push(env.DB.prepare("UPDATE leads SET status='review',pipeline_stage='needs_review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
+       needsReview.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,summary:result.summary||"",gaps:result.gaps||[],recommended_next_action:result.recommended_next_action||""});
       }else{
        statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
        statements.push(env.DB.prepare("INSERT INTO unqualified_leads (id,organisation_id,lead_id,qualification_run_id,fit_score,qualification_summary,qualification_json) VALUES (?,?,?,?,?,?,?) ON CONFLICT(organisation_id,lead_id) DO UPDATE SET qualification_run_id=excluded.qualification_run_id,fit_score=excluded.fit_score,qualification_summary=excluded.qualification_summary,qualification_json=excluded.qualification_json,assessed_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')").bind(crypto.randomUUID(),org,lead.id,runId,result.fit_score,result.summary||"",JSON.stringify(result)));
@@ -386,9 +393,9 @@ async function handleBulkLeadQualification(request,env){
      }
      if(statements.length)await env.DB.batch(statements);
      processed=Math.min(offset+batch.length,leads.length);
-     emit({type:"progress",stage:"assessing",processed,total:leads.length,checked:qualified.length+notQualified.length,qualified_count:qualified.length,not_qualified_count:notQualified.length,failed_count:errors.length,batch:Math.floor(offset/batchSize)+1,total_batches:totalBatches,model});
+     emit({type:"progress",stage:"assessing",processed,total:leads.length,checked:qualified.length+needsReview.length+notQualified.length,qualified_count:qualified.length,needs_review_count:needsReview.length,not_qualified_count:notQualified.length,failed_count:errors.length,batch:Math.floor(offset/batchSize)+1,total_batches:totalBatches,model});
     }
-    emit({type:"complete",result:{success:errors.length===0,profile_version:version,model,source_lead_count:leads.length,criteria,checked:qualified.length+notQualified.length,qualified_count:qualified.length,not_qualified_count:notQualified.length,failed_count:errors.length,qualified,not_qualified:notQualified,errors}});
+    emit({type:"complete",result:{success:errors.length===0,profile_version:version,model,source_lead_count:leads.length,criteria,checked:qualified.length+needsReview.length+notQualified.length,qualified_count:qualified.length,needs_review_count:needsReview.length,not_qualified_count:notQualified.length,failed_count:errors.length,qualified,needs_review:needsReview,not_qualified:notQualified,errors}});
    }catch(error){
     console.error("Bulk lead qualification failed",error);
     emit({type:"error",error:"Qualification stopped: "+String(error.message||"Unexpected error").slice(0,350),checked:qualified.length+notQualified.length,processed,qualified_count:qualified.length,failed_count:leads.length-qualified.length-notQualified.length,model});
@@ -408,6 +415,26 @@ async function handleUnqualifiedLeads(request,env){
  if(request.method!=="GET")return json({error:"Method not allowed."},405);
  const rows=await env.DB.prepare("SELECT u.lead_id,u.fit_score,u.qualification_summary,u.qualification_json,u.assessed_at,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission FROM unqualified_leads u JOIN leads l ON l.id=u.lead_id WHERE u.organisation_id=? ORDER BY u.assessed_at DESC LIMIT 200").bind("dev-donninger").all();
  return json({unqualified_leads:rows.results||[]});
+}
+async function handleReviewLeads(request,env){
+ const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
+ const org="dev-donninger";
+ if(request.method==="GET"){
+  const rows=await env.DB.prepare("SELECT l.id AS lead_id,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission,r.fit_score,COALESCE(json_extract(r.result_json,'$.summary'),'Needs human review') AS qualification_summary,r.result_json AS qualification_json,r.completed_at AS assessed_at FROM leads l LEFT JOIN sales_qualification_runs r ON r.id=(SELECT id FROM sales_qualification_runs WHERE organisation_id=l.organisation_id AND lead_id=l.id ORDER BY completed_at DESC LIMIT 1) WHERE l.organisation_id=? AND l.status='review' ORDER BY l.updated_at DESC LIMIT 200").bind(org).all();
+  return json({review_leads:rows.results||[]});
+ }
+ if(request.method==="POST"){
+  let body;try{body=await request.json();}catch{return json({error:"Invalid request."},400);}
+  const leadId=String(body.lead_id||"").trim();if(!leadId||leadId.length>200)return json({error:"A valid lead ID is required."},400);
+  const lead=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=? AND status='lost'").bind(leadId,org).first();
+  if(!lead)return json({error:"This unqualified lead could not be found. Refresh the table and try again."},404);
+  await env.DB.batch([
+   env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,leadId),
+   env.DB.prepare("UPDATE leads SET status='review',pipeline_stage='needs_review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='lost'").bind(org,leadId)
+  ]);
+  return json({success:true,message:"Lead moved to Needs Review."});
+ }
+ return json({error:"Method not allowed."},405,{allow:"GET, POST"});
 }
 
 
@@ -943,6 +970,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/qualify-batch") return handleBulkLeadQualification(request, env);
   if (url.pathname === "/api/sales/qualified-leads") return handleQualifiedLeads(request, env);
   if (url.pathname === "/api/sales/unqualified-leads") return handleUnqualifiedLeads(request, env);
+  if (url.pathname === "/api/sales/review-leads") return handleReviewLeads(request, env);
   if (url.pathname === "/api/sales/appointments/respond") return handleAdminMeetingDecision(request, env);
   if (url.pathname === "/api/sales/appointments") return handleSalesAppointments(request, env);
   if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
