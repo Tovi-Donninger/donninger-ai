@@ -97,3 +97,15 @@
 .meeting-approval-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .meeting-approval-actions .portal-button{font-size:12px;padding:9px 12px}
 .meeting-approval-actions .portal-button:disabled{opacity:.55;cursor:wait}
+
+
+/* Compact lead tables with independent scrolling and live search */
+.sales-table-wrap{max-height:300px;overflow-y:auto;overflow-x:auto;position:relative;border:1px solid #e7edf4;border-radius:9px;background:#fff;scrollbar-width:thin;scrollbar-color:#b8c8d9 #f2f5f9}
+.sales-table-wrap:empty{border:0}
+.sales-table-search{position:sticky;top:0;z-index:3;display:block;width:min(360px,100%);box-sizing:border-box;margin:0 0 8px;padding:9px 12px;border:1px solid #dce5ef;border-radius:8px;background:#fff;color:#24344e;font:11px var(--font);outline:none}
+.sales-table-search:focus{border-color:#4b8fd5;box-shadow:0 0 0 3px #4b8fd51c}
+.sales-table-wrap .sales-lead-table{min-width:680px}
+.sales-table-wrap .sales-lead-table th{position:sticky;top:42px;z-index:2}
+.sales-table-wrap .sales-lead-table tr[hidden]{display:none}
+.sales-pipeline-card{margin-top:0!important;margin-bottom:20px}
+.sales-pipeline-board{max-height:430px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#b8c8d9 #f2f5f9}
