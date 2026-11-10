@@ -109,3 +109,19 @@
 .sales-table-wrap .sales-lead-table tr[hidden]{display:none}
 .sales-pipeline-card{margin-top:0!important;margin-bottom:20px}
 .sales-pipeline-board{max-height:430px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#b8c8d9 #f2f5f9}
+
+/* Lead edit dialog */
+.lead-edit-overlay{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(7,18,38,.68);backdrop-filter:blur(5px)}
+.lead-edit-dialog{width:min(680px,100%);max-height:min(90vh,820px);overflow-y:auto;padding:26px;border:1px solid #e2eaf3;border-radius:16px;background:#fff;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+.lead-edit-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.lead-edit-heading h2{margin:5px 0 0;color:#1b304d;font:800 22px var(--display)}
+.lead-edit-close{width:34px;height:34px;border:0;border-radius:8px;background:#f0f4f8;color:#526780;font-size:23px;cursor:pointer}
+.lead-edit-form{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.lead-edit-form label{display:grid;gap:6px;color:#526780;font-size:10px;font-weight:700}
+.lead-edit-form input,.lead-edit-form select,.lead-edit-form textarea{width:100%;box-sizing:border-box;border:1px solid #dce5ef;border-radius:8px;padding:11px;background:#fbfcfe;color:#24344e;font:12px var(--font)}
+.lead-edit-form input:focus,.lead-edit-form select:focus,.lead-edit-form textarea:focus{outline:2px solid #3478f622;border-color:#6d9df8}
+.lead-edit-wide,.lead-edit-message,.lead-edit-actions{grid-column:1/-1}
+.lead-edit-message{min-height:16px;margin:0;color:#5479a7;font-size:10px}
+.lead-edit-actions{display:flex;justify-content:flex-end;gap:9px}
+.lead-edit-actions button{margin:0}
+@media(max-width:580px){.lead-edit-dialog{padding:19px}.lead-edit-form{grid-template-columns:1fr}.lead-edit-wide,.lead-edit-message,.lead-edit-actions{grid-column:auto}.lead-edit-actions{flex-direction:column-reverse}.lead-edit-actions button{width:100%}}
