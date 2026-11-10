@@ -306,14 +306,20 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   const button=document.getElementById("contactQualifiedLeads"),composer=document.getElementById("salesOutreachComposer"),status=document.getElementById("salesOutreachStatus"),list=document.getElementById("salesOutreachDraftList");
   if(!button||!composer||!status||!list)return;
   const selected=[...document.querySelectorAll(".qualified-lead-select:checked")].map(box=>box.dataset.leadId).filter(Boolean);
-  if(!selected.length){status.textContent="Select James Wilson first.";composer.hidden=false;return;}
-  if(selected.length!==1){status.textContent="For this first live-email test, select James Wilson only. Other recipients remain blocked.";composer.hidden=false;return;}
-  button.disabled=true;composer.hidden=false;list.innerHTML="";status.textContent="Preparing James Wilson's personalised email and sending it through Gmail…";
+  if(!selected.length){status.textContent="Select at least one qualified lead to contact.";composer.hidden=false;return;}
+  button.disabled=true;composer.hidden=false;list.innerHTML="";
+  status.textContent="Preparing personalised emails for "+selected.length+" selected lead(s) and sending through Gmail…";
   try{
    const r=await fetch("/api/sales/outreach/send",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_ids:selected})});
-   const d=await r.json();if(!r.ok||d.success!==true)throw new Error(d.error||"Gmail did not confirm the email send.");
-   list.innerHTML='<article class="sales-email-draft-card"><strong>'+escapeHtml(d.name)+'</strong><p><strong>To:</strong> '+escapeHtml(d.recipient)+'</p><p><strong>Subject:</strong> '+escapeHtml(d.subject)+'</p><span class="status-tag">SENT · GMAIL CONFIRMED</span></article>';
-   status.textContent=d.message||"Test email sent.";composer.scrollIntoView({behavior:"smooth",block:"nearest"});
+   const d=await r.json();
+   if(!r.ok&&!d.sent?.length)throw new Error(d.error||"Gmail did not confirm any email sends.");
+   const sent=Array.isArray(d.sent)?d.sent:[],failed=Array.isArray(d.failed)?d.failed:[],skipped=Array.isArray(d.skipped)?d.skipped:[];
+   const cards=sent.map(item=>'<article class="sales-email-draft-card"><strong>'+escapeHtml(item.name||"Lead")+'</strong><p><strong>To:</strong> '+escapeHtml(item.recipient||"")+'</p><p><strong>Subject:</strong> '+escapeHtml(item.subject||"")+'</p><span class="status-tag">SENT · GMAIL CONFIRMED</span></article>');
+   const issues=[...failed.map(item=>({label:"Not sent",item})),...skipped.map(item=>({label:"Skipped",item}))];
+   const issueCards=issues.map(entry=>'<article class="sales-email-draft-card"><strong>'+entry.label+': '+escapeHtml(entry.item.lead_id||"Lead")+'</strong><p>'+escapeHtml(entry.item.reason||"No further details were provided.")+'</p></article>');
+   list.innerHTML=cards.concat(issueCards).join("");
+   status.textContent=d.message||sent.length+" email(s) sent; "+failed.length+" failed; "+skipped.length+" skipped.";
+   composer.scrollIntoView({behavior:"smooth",block:"nearest"});
   }catch(error){status.textContent=error.message;}
   finally{button.disabled=false;}
  }
