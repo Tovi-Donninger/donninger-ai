@@ -113,7 +113,7 @@ async function handleSalesLeads(request, env) {
   const organisationId = "dev-donninger";
   if (request.method === "GET") {
     const result = await env.DB.prepare(
-      "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, created_at, updated_at FROM leads WHERE organisation_id = ? AND status = 'new' ORDER BY created_at DESC LIMIT 200"
+      "SELECT id, first_name, last_name, email, phone, company, job_title, source, customer_need, status, priority, contact_permission, created_at, updated_at FROM leads WHERE organisation_id = ? AND status = 'new' AND pipeline_stage = 'new' ORDER BY created_at DESC LIMIT 200"
     ).bind(organisationId).all();
     return json({ leads: result.results || [] });
   }
@@ -305,7 +305,7 @@ async function handleBulkLeadQualification(request,env){
  const description=String(body.description||"").trim().slice(0,5000);
  if(description.length<20)return json({error:"Please describe what a qualified lead means in at least 20 characters."},400);
  const org="dev-donninger";let model=String(env.GEMINI_MODEL||"gemini-3.5-flash-lite").trim();
- const leadsResult=await env.DB.prepare("SELECT id,first_name,last_name,email,phone,company,job_title,source,customer_need,status FROM leads WHERE organisation_id=? AND status='new' ORDER BY created_at DESC LIMIT 200").bind(org).all();
+ const leadsResult=await env.DB.prepare("SELECT id,first_name,last_name,email,phone,company,job_title,source,customer_need,status FROM leads WHERE organisation_id=? AND status='new' AND pipeline_stage='new' ORDER BY created_at DESC LIMIT 200").bind(org).all();
  const leads=leadsResult.results||[];
  if(!leads.length)return json({error:"There are no imported leads to qualify yet."},400);
  const criteriaSchema={type:"OBJECT",properties:{definition:{type:"STRING"},must_have:{type:"ARRAY",items:{type:"STRING"}},strong_signals:{type:"ARRAY",items:{type:"STRING"}},disqualifiers:{type:"ARRAY",items:{type:"STRING"}},unknown_handling:{type:"STRING"},qualification_threshold:{type:"INTEGER"}},required:["definition","must_have","strong_signals","disqualifiers","unknown_handling","qualification_threshold"]};
@@ -382,7 +382,7 @@ async function handleBulkLeadQualification(request,env){
       }else if(result.classification==="needs_review"){
        statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
        statements.push(env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
-       statements.push(env.DB.prepare("UPDATE leads SET status='review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
+       statements.push(env.DB.prepare("UPDATE leads SET pipeline_stage='needs_review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='new'").bind(org,lead.id));
        needsReview.push({lead_id:lead.id,name:(lead.first_name+" "+(lead.last_name||"")).trim(),fit_score:result.fit_score,summary:result.summary||"",gaps:result.gaps||[],recommended_next_action:result.recommended_next_action||""});
       }else{
        statements.push(env.DB.prepare("DELETE FROM qualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,lead.id));
@@ -420,18 +420,18 @@ async function handleReviewLeads(request,env){
  const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
  const org="dev-donninger";
  if(request.method==="GET"){
-  const rows=await env.DB.prepare("SELECT l.id AS lead_id,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission,r.fit_score,COALESCE(json_extract(r.result_json,'$.summary'),'Needs human review') AS qualification_summary,r.result_json AS qualification_json,r.completed_at AS assessed_at FROM leads l LEFT JOIN sales_qualification_runs r ON r.id=(SELECT id FROM sales_qualification_runs WHERE organisation_id=l.organisation_id AND lead_id=l.id ORDER BY completed_at DESC LIMIT 1) WHERE l.organisation_id=? AND l.status='review' ORDER BY l.updated_at DESC LIMIT 200").bind(org).all();
+  const rows=await env.DB.prepare("SELECT l.id AS lead_id,l.first_name,l.last_name,l.company,l.email,l.phone,l.job_title,l.customer_need,l.contact_permission,r.fit_score,COALESCE(json_extract(r.result_json,'$.summary'),'Needs human review') AS qualification_summary,r.result_json AS qualification_json,r.completed_at AS assessed_at FROM leads l LEFT JOIN sales_qualification_runs r ON r.id=(SELECT id FROM sales_qualification_runs WHERE organisation_id=l.organisation_id AND lead_id=l.id ORDER BY completed_at DESC LIMIT 1) WHERE l.organisation_id=? AND l.pipeline_stage='needs_review' ORDER BY l.updated_at DESC LIMIT 200").bind(org).all();
   return json({review_leads:rows.results||[]});
  }
  if(request.method==="POST"){
   let body;try{body=await request.json();}catch{return json({error:"Invalid request."},400);}
   const leadId=String(body.lead_id||"").trim();if(!leadId||leadId.length>200)return json({error:"A valid lead ID is required."},400);
-  const lead=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=? AND status='lost'").bind(leadId,org).first();
+  const lead=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=? AND status='lost' AND pipeline_stage='unqualified'").bind(leadId,org).first();
   if(!lead)return json({error:"This unqualified lead could not be found. Refresh the table and try again."},404);
   try {
    await env.DB.batch([
     env.DB.prepare("DELETE FROM unqualified_leads WHERE organisation_id=? AND lead_id=?").bind(org,leadId),
-    env.DB.prepare("UPDATE leads SET status='review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='lost'").bind(org,leadId)
+    env.DB.prepare("UPDATE leads SET pipeline_stage='needs_review',updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE organisation_id=? AND id=? AND status='lost' AND pipeline_stage='unqualified'").bind(org,leadId)
    ]);
    return json({success:true,message:"Lead moved to Needs Review."});
   } catch(error) {
