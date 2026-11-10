@@ -436,7 +436,8 @@ async function handleReviewLeads(request,env){
    return json({success:true,message:"Lead moved to Needs Review."});
   } catch(error) {
    console.error("Move lead to review failed:",error);
-   return json({error:"The lead could not be moved because the database operation failed. Please refresh and try again."},500);
+   const detail=String(error?.message||"Unknown database error").slice(0,500);
+   return json({error:"Database error while moving lead: "+detail},500);
   }
  }
  return json({error:"Method not allowed."},405,{allow:"GET, POST"});
