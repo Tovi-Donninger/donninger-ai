@@ -542,18 +542,21 @@ async function handleAdminMeetingDecision(request, env) {
       name:[appointment.first_name,appointment.last_name].filter(Boolean).join(" ")||"there",
       company:appointment.company||"",
       meeting_time:start.toISOString(),
+      meeting_options:(()=>{try{const a=JSON.parse(appointment.meeting_options_json||"[]");return Array.isArray(a)&&a.length?a:[{start_iso:start.toISOString(),timezone:timezone,original_text:"Selected proposal"}];}catch{return [{start_iso:start.toISOString(),timezone:timezone,original_text:"Selected proposal"}];}})(),
       timezone:timezone,
       duration_minutes:Number(appointment.duration_minutes||30),
       summary:appointment.discussion_summary||"",
       admin_approved:true
     });
     if(booking.booked!==true)throw new Error(booking.message||"Google Calendar did not confirm the invitation.");
+    const selectedMeetingTime=String(booking.selected_meeting_time||start.toISOString());
+    const selectedTimezone=String(booking.selected_timezone||timezone);
     const sentAt=new Date().toISOString();
     await env.DB.batch([
-      env.DB.prepare("UPDATE sales_appointments SET confirmation_email_sent_at=?,updated_at=? WHERE id=? AND organisation_id=? AND admin_accepted_at IS NOT NULL AND status='requested'").bind(sentAt,sentAt,id,org),
-      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_calendar_invitation_sent',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,calendar_event_id:booking.event_id,guest_email:appointment.email,requested_start_at:start.toISOString(),timezone:timezone}),auth.session.email)
+      env.DB.prepare("UPDATE sales_appointments SET requested_start_at=?,prospect_timezone=?,availability_status='available',confirmation_email_sent_at=?,updated_at=? WHERE id=? AND organisation_id=? AND admin_accepted_at IS NOT NULL AND status='requested'").bind(selectedMeetingTime,selectedTimezone,sentAt,sentAt,id,org),
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_calendar_invitation_sent',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,calendar_event_id:booking.event_id,guest_email:appointment.email,requested_start_at:selectedMeetingTime,timezone:selectedTimezone,options_checked:true}),auth.session.email)
     ]);
-    return json({success:true,status:"awaiting_client",invite_sent:true,event_id:booking.event_id,message:"Your approval is recorded and the official Google Calendar invitation has been sent. The meeting will be confirmed when the lead accepts it in Google Calendar."});
+    return json({success:true,status:"awaiting_client",invite_sent:true,event_id:booking.event_id,selected_meeting_time:selectedMeetingTime,selected_timezone:selectedTimezone,message:"Your approval is recorded and the official Google Calendar invitation has been sent. The meeting will be confirmed when the lead accepts it in Google Calendar."});
   }catch(error){
     console.error("Google Calendar invitation creation failed:",error);
     await env.DB.prepare("UPDATE sales_appointments SET admin_accepted_at=NULL,confirmation_email_sent_at=NULL,updated_at=? WHERE id=? AND organisation_id=? AND status='requested'").bind(new Date().toISOString(),id,org).run();
@@ -711,6 +714,8 @@ async function handleSalesAppointments(request, env) {
       a.timezone,
       a.prospect_timezone,
       a.discussion_summary,
+      a.meeting_options_json,
+      a.availability_status,
       a.prospect_accepted_at,
       a.admin_accepted_at,
       a.confirmation_email_sent_at,
