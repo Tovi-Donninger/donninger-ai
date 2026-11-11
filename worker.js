@@ -498,6 +498,34 @@ async function sendMeetingEmail(env, payload) {
   if (!upstream.ok || !result || result.success !== true) throw new Error(result?.message || "Meeting email service did not confirm delivery.");
   return result;
 }
+async function handleSelectMeetingTime(request,env){
+  const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
+  if(request.method!=="POST")return json({error:"Method not allowed."},405,{allow:"POST"});
+  let body;try{body=await request.json();}catch{return json({error:"Invalid request."},400);}
+  const id=String(body.appointment_id||"").trim(),startIso=String(body.start_iso||"").trim(),timezone=String(body.timezone||"").trim();
+  if(!id||!startIso||!timezone)return json({error:"Choose one of the proposed meeting times."},400);
+  const org="dev-donninger";
+  const a=await env.DB.prepare("SELECT a.*,l.email FROM sales_appointments a JOIN leads l ON l.id=a.lead_id WHERE a.id=? AND a.organisation_id=? AND l.organisation_id=?").bind(id,org,org).first();
+  if(!a)return json({error:"Meeting request not found."},404);
+  if(a.status!=="requested"||a.admin_accepted_at)return json({error:"This meeting request is no longer open for time selection."},409);
+  let opts=[];try{opts=JSON.parse(a.meeting_options_json||"[]");}catch{}
+  const option=Array.isArray(opts)?opts.find(o=>String(o.start_iso||"")===startIso&&String(o.timezone||"")===timezone):null;
+  if(!option)return json({error:"That time is not one of the options extracted from the customer's email."},400);
+  const start=new Date(startIso);if(!Number.isFinite(start.getTime())||start.getTime()<=Date.now()+300000)return json({error:"That proposed time has passed or is too close to book."},400);
+  try{new Intl.DateTimeFormat("en-US",{timeZone:timezone});}catch{return json({error:"The proposed timezone could not be verified. Ask the customer to clarify it."},400);}
+  try{
+    const check=await sendMeetingEmail(env,{action:"check_meeting_availability",meeting_options:[{start_iso:start.toISOString(),timezone,original_text:String(option.original_text||"Selected proposal")}],duration_minutes:Number(a.duration_minutes||30)});
+    if(check.available!==true||!check.selected_meeting_time||new Date(check.selected_meeting_time).getTime()!==start.getTime()){
+      await env.DB.prepare("UPDATE sales_appointments SET requested_start_at=?,prospect_timezone=?,availability_status='not_available',updated_at=? WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NULL").bind(start.toISOString(),timezone,new Date().toISOString(),id,org).run();
+      return json({success:true,available:false,message:"That exact time is unavailable in the Donninger support calendar. Select another proposed time."});
+    }
+    const now=new Date().toISOString();
+    const changed=await env.DB.prepare("UPDATE sales_appointments SET requested_start_at=?,prospect_timezone=?,availability_status='available',updated_at=? WHERE id=? AND organisation_id=? AND status='requested' AND admin_accepted_at IS NULL").bind(start.toISOString(),timezone,now,id,org).run();
+    if(!changed.meta||changed.meta.changes!==1)return json({error:"The meeting request changed during the availability check. Refresh and try again."},409);
+    await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_time_selected',?,?)").bind(crypto.randomUUID(),org,a.lead_id,JSON.stringify({appointment_id:id,selected_start_at:start.toISOString(),timezone,availability:"available"}),auth.session.email).run();
+    return json({success:true,available:true,selected_meeting_time:start.toISOString(),timezone,message:"Selected time is available. You can now approve it and send the invitation."});
+  }catch(error){console.error("Selected meeting availability check failed:",error);return json({error:"Could not verify that time against the support calendar. No invitation was sent. "+String(error.message||error).slice(0,160)},502);}
+}
 async function handleAdminMeetingDecision(request, env) {
   const auth=await requireAdmin(request,env); if(auth.error)return auth.error;
   if(request.method!=="POST")return json({error:"Method not allowed."},405,{allow:"POST"});
@@ -523,7 +551,7 @@ async function handleAdminMeetingDecision(request, env) {
   }
 
   if(appointment.admin_accepted_at)return json({error:"Administrator approval has already been recorded."},409);
-  if(appointment.availability_status==="no_available_options")return json({error:"All proposed times conflict with the organiser calendar. Ask the prospect for new options before approving."},409);
+  if(appointment.availability_status==="no_available_options"||appointment.availability_status==="not_available")return json({error:"The selected time is unavailable. Select and check another proposed time before approving."},409);
   if(appointment.availability_status!=="available")return json({error:"Calendar availability has not been verified yet. Deploy the updated Google Apps Script and retry the availability check before approving."},409);
   const start=appointment.requested_start_at?new Date(appointment.requested_start_at):null;
   const timezone=String(appointment.prospect_timezone||appointment.timezone||"").trim();
@@ -1115,6 +1143,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/qualified-leads") return handleQualifiedLeads(request, env);
   if (url.pathname === "/api/sales/unqualified-leads") return handleUnqualifiedLeads(request, env);
   if (url.pathname === "/api/sales/review-leads") return handleReviewLeads(request, env);
+  if (url.pathname === "/api/sales/appointments/select-time") return handleSelectMeetingTime(request, env);
   if (url.pathname === "/api/sales/appointments/respond") return handleAdminMeetingDecision(request, env);
   if (url.pathname === "/api/sales/calendar-rsvp") return handleCalendarRsvp(request, env);
   if (url.pathname === "/api/sales/appointments") return handleSalesAppointments(request, env);
