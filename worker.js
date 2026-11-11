@@ -794,8 +794,17 @@ async function handleSalesEmailHistory(request, env) {
   if (!lead) return json({ error: 'Lead not found.' }, 404);
 
   const messages = await env.DB.prepare(
-    'SELECT id,gmail_message_id,direction,sender_email,recipient_email,subject,body_text,intent,received_at,created_at FROM sales_email_messages WHERE organisation_id=? AND lead_id=? ORDER BY created_at DESC LIMIT 100'
-  ).bind(org, leadId).all();
+    "SELECT id,gmail_message_id,direction,sender_email,recipient_email,subject,body_text,intent,received_at,created_at FROM (" +
+    "SELECT id,provider_message_id AS gmail_message_id,direction," +
+    "CASE WHEN direction='outbound' THEN 'Donninger.AI' ELSE sender END AS sender_email," +
+    "recipient AS recipient_email,subject,body AS body_text,'' AS intent," +
+    "COALESCE(sent_at,created_at) AS received_at,created_at " +
+    "FROM sales_messages WHERE organisation_id=? AND lead_id=? AND channel='email' AND status IN ('sent','delivered','received') " +
+    "UNION ALL " +
+    "SELECT id,gmail_message_id,direction,sender_email,recipient_email,subject,body_text,intent,received_at,created_at " +
+    "FROM sales_email_messages WHERE organisation_id=? AND lead_id=?" +
+    ") ORDER BY created_at DESC LIMIT 100"
+  ).bind(org, leadId, org, leadId).all();
 
   const activities = await env.DB.prepare(
     'SELECT activity_type,details_json,actor,created_at FROM sales_activity WHERE organisation_id=? AND lead_id=? ORDER BY created_at DESC LIMIT 100'
