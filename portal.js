@@ -147,11 +147,12 @@ async function loadSalesAppointments(){
       '<small>Timezone: '+escapeHtml(timezone)+'</small>'+
       '<small>'+escapeHtml(availabilityLabel)+'</small>'+
       optionsHtml+
+      (v.availability_status==="no_available_options"?'<p><strong>Action required:</strong> Request new meeting times; all current options conflict with the calendar.</p>':"")+
       '<p><strong>Latest email:</strong> '+escapeHtml(v.latest_email_subject||"No email subject")+'</p>'+
       email+
       '<small>Admin approval: '+(v.admin_accepted_at?"Recorded":"Not yet recorded")+
       ' · Client acceptance: '+(v.prospect_accepted_at?"Recorded":"Not yet recorded")+'</small>'+
-      (v.status==="requested"&&!v.admin_accepted_at?'<div class="meeting-approval-actions"><button type="button" class="portal-button portal-button-primary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="accept">Approve &amp; email client</button><button type="button" class="portal-button portal-button-secondary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="decline">Decline</button></div>':"")+
+      (v.status==="requested"&&!v.admin_accepted_at&&v.availability_status!=="no_available_options"&&Boolean(v.requested_start_at)?'<div class="meeting-approval-actions"><button type="button" class="portal-button portal-button-primary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="accept">Approve &amp; email client</button><button type="button" class="portal-button portal-button-secondary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="decline">Decline</button></div>':"")+
       (v.status==="requested"&&v.admin_accepted_at?'<p class="sales-stage">Waiting for the client to confirm'+(v.confirmation_email_sent_at?'':' · confirmation email needs attention')+'</p>':"")+
      '</article>';
     }).join(""):'<div class="sales-empty-state">No meetings in this group.</div>')+
