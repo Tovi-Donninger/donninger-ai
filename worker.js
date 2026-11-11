@@ -1019,50 +1019,46 @@ async function handleSalesReplyIngest(request, env) {
   let outboundReply = "";
 
   if (intent === "meeting_request") {
-    const proposedText = String(analysis.meeting_proposed_text || "").trim().slice(0, 1000);
-    const rawStart = String(analysis.meeting_start_iso || "").trim();
-    const proposedTimezone = String(analysis.meeting_timezone || "").trim().slice(0, 100);
-    const durationValue = Number(analysis.meeting_duration_minutes || 30);
-    meetingDuration = Number.isInteger(durationValue) && durationValue >= 15 && durationValue <= 180 ? durationValue : 30;
-    if (rawStart && proposedTimezone) {
-      const parsedStart = new Date(rawStart);
-      try {
-        new Intl.DateTimeFormat("en-US", { timeZone: proposedTimezone });
-        if (/(?:[zZ]|[+-]\d{2}:\d{2})$/.test(rawStart) && Number.isFinite(parsedStart.getTime()) && parsedStart.getTime() > Date.now() + 5 * 60 * 1000) {
-          meetingStart = parsedStart.toISOString();
-          meetingTimezone = proposedTimezone;
-        }
-      } catch {}
+    const proposedText=String(analysis.meeting_proposed_text||"").trim().slice(0,1000);
+    const durationValue=Number(analysis.meeting_duration_minutes||30);
+    meetingDuration=Number.isInteger(durationValue)&&durationValue>=15&&durationValue<=180?durationValue:30;
+    const rawOptions=Array.isArray(analysis.meeting_options)?analysis.meeting_options:[];
+    if(!rawOptions.length&&analysis.meeting_start_iso&&analysis.meeting_timezone)rawOptions.push({start_iso:analysis.meeting_start_iso,timezone:analysis.meeting_timezone,original_text:proposedText||"Proposed meeting time"});
+    const seenOptions=new Set(),meetingOptions=[];
+    for(const item of rawOptions.slice(0,20)){
+      const rawStart=String(item?.start_iso||"").trim(),optionTimezone=String(item?.timezone||"").trim().slice(0,100),originalText=String(item?.original_text||"").trim().slice(0,300);
+      if(!rawStart||!optionTimezone||(!rawStart.endsWith("Z")&&!/[+-][0-9]{2}:[0-9]{2}$/.test(rawStart)))continue;
+      const parsed=new Date(rawStart);
+      try{new Intl.DateTimeFormat("en-US",{timeZone:optionTimezone});if(!Number.isFinite(parsed.getTime())||parsed.getTime()<=Date.now()+300000)continue;}catch{continue;}
+      const key=parsed.toISOString()+"|"+optionTimezone;if(seenOptions.has(key))continue;seenOptions.add(key);
+      meetingOptions.push({start_iso:parsed.toISOString(),timezone:optionTimezone,original_text:originalText||proposedText||"Proposed meeting time"});
     }
-    meetingSummary = proposedText || summary;
-    const active = await env.DB.prepare("SELECT id FROM sales_appointments WHERE organisation_id=? AND lead_id=? AND status='requested' ORDER BY created_at DESC LIMIT 1").bind(org,lead.id).first();
-    meetingAppointmentId = active?.id || crypto.randomUUID();
-
-    if (meetingStart && meetingTimezone) {
-      // A lead proposal is NOT a booking. Keep the appointment pending until
-      // the administrator approves it and the lead later accepts the invitation.
-      outboundReply = "Hi " + (lead.first_name || "there") + ",\\n\\nThank you for suggesting a meeting time. I've received your proposal and will check it with our team. We'll send you an official Google Calendar invitation once the time has been approved. No meeting has been booked yet.\\n\\nKind regards,\\nTovi Donninger\\nFounder, Donninger.AI";
-    } else {
-      outboundReply = suggestedReply || ("Hi " + (lead.first_name || "there") + ",\\n\\nThank you for getting back to us. Could you please suggest a suitable date, time and timezone for a short Zoom meeting?\\n\\nKind regards,\\nTovi Donninger\\nFounder, Donninger.AI");
+    meetingOptions.sort((a,b)=>new Date(a.start_iso).getTime()-new Date(b.start_iso).getTime());
+    meetingSummary=proposedText||summary;
+    const active=await env.DB.prepare("SELECT id FROM sales_appointments WHERE organisation_id=? AND lead_id=? AND status=? ORDER BY created_at DESC LIMIT 1").bind(org,lead.id,"requested").first();
+    meetingAppointmentId=active?.id||crypto.randomUUID();
+    let availabilityStatus=meetingOptions.length?"not_checked":"needs_clarification";
+    let selectedOption=meetingOptions[0]||null;
+    if(meetingOptions.length){
+      try{
+        const check=await sendMeetingEmail(env,{action:"check_meeting_availability",meeting_options:meetingOptions,duration_minutes:meetingDuration});
+        if(check.available===true&&check.selected_meeting_time){
+          const selectedTime=new Date(check.selected_meeting_time);
+          if(Number.isFinite(selectedTime.getTime())){selectedOption=meetingOptions.find(o=>new Date(o.start_iso).getTime()===selectedTime.getTime())||selectedOption;availabilityStatus="available";}
+        }else if(check.available===false){availabilityStatus="no_available_options";selectedOption=null;}
+      }catch(error){console.error("Meeting availability pre-check failed:",error);}
     }
-
-    const meetingNow = new Date().toISOString();
-    if (active) {
-      statements.push(
-        env.DB.prepare("UPDATE sales_appointments SET status=?,requested_start_at=?,confirmed_start_at=?,duration_minutes=?,timezone='Asia/Jerusalem',prospect_timezone=?,prospect_accepted_at=?,admin_accepted_at=?,confirmation_email_sent_at=?,discussion_summary=?,updated_at=? WHERE id=? AND organisation_id=? AND status='requested'")
-          .bind(meetingBooked ? "confirmed" : "requested",meetingStart,meetingBooked?meetingStart:null,meetingDuration,meetingTimezone,meetingBooked?meetingNow:null,meetingBooked?meetingNow:null,meetingBooked?meetingNow:null,meetingSummary,meetingNow,meetingAppointmentId,org)
-      );
-    } else {
-      statements.push(
-        env.DB.prepare("INSERT INTO sales_appointments (id,organisation_id,lead_id,status,requested_start_at,confirmed_start_at,duration_minutes,timezone,prospect_timezone,prospect_accepted_at,admin_accepted_at,confirmation_email_sent_at,discussion_summary,created_at,updated_at) VALUES (?,?,?, ?,?,?,?,?,?,?,?,?,?,?,?)")
-          .bind(meetingAppointmentId,org,lead.id,meetingBooked?"confirmed":"requested",meetingStart,meetingBooked?meetingStart:null,meetingDuration,"Asia/Jerusalem",meetingTimezone,meetingBooked?meetingNow:null,meetingBooked?meetingNow:null,meetingBooked?meetingNow:null,meetingSummary,meetingNow,meetingNow)
-      );
+    meetingStart=selectedOption?selectedOption.start_iso:null;
+    meetingTimezone=selectedOption?selectedOption.timezone:"";
+    outboundReply=meetingOptions.length?"Hi "+(lead.first_name||"there")+", "+nl+nl+"Thank you for suggesting meeting times. We have received your options and will check them with our team, starting with the earliest available time. We will send an official Google Calendar invitation once a time has been approved. No meeting has been booked yet."+nl+nl+"Kind regards,"+nl+"Tovi Donninger"+nl+"Founder, Donninger.AI":(suggestedReply||"Please suggest one or more suitable dates, times and your timezone for a short Zoom meeting.");
+    const meetingNow=new Date().toISOString(),optionsJson=JSON.stringify(meetingOptions);
+    if(active){
+      statements.push(env.DB.prepare("UPDATE sales_appointments SET requested_start_at=?,confirmed_start_at=NULL,duration_minutes=?,prospect_timezone=?,meeting_options_json=?,availability_status=?,prospect_accepted_at=NULL,admin_accepted_at=NULL,confirmation_email_sent_at=NULL,discussion_summary=?,updated_at=? WHERE id=? AND organisation_id=? AND status=?").bind(meetingStart,meetingDuration,meetingTimezone,optionsJson,availabilityStatus,meetingSummary,meetingNow,meetingAppointmentId,org,"requested"));
+    }else{
+      statements.push(env.DB.prepare("INSERT INTO sales_appointments (id,organisation_id,lead_id,status,requested_start_at,confirmed_start_at,duration_minutes,timezone,prospect_timezone,meeting_options_json,availability_status,discussion_summary,created_at,updated_at) VALUES (?,?,?,?,?,NULL,?,?,?,?,?,?,?,?)").bind(meetingAppointmentId,org,lead.id,"requested",meetingStart,meetingDuration,"Asia/Jerusalem",meetingTimezone,optionsJson,availabilityStatus,meetingSummary,meetingNow,meetingNow));
     }
-    statements.push(
-      env.DB.prepare("UPDATE leads SET pipeline_stage=?,status='proposal',updated_at=? WHERE id=? AND organisation_id=?")
-        .bind(meetingBooked?"meeting_confirmed":"meeting_requested",meetingNow,lead.id,org)
-    );
-  } else if (intent === "unsubscribe") {
+    statements.push(env.DB.prepare("UPDATE leads SET pipeline_stage=?,status=?,updated_at=? WHERE id=? AND organisation_id=?").bind("meeting_requested","proposal",meetingNow,lead.id,org));
+  }else if (intent === "unsubscribe") {
     outboundReply = "Hi " + (lead.first_name || "there") + ",\n\nThank you for letting us know. We've recorded your request and will not send you further sales emails.\n\nKind regards,\nTovi Donninger\nFounder, Donninger.AI";
     statements.push(env.DB.prepare("UPDATE leads SET contact_permission='do_not_contact',updated_at=? WHERE id=? AND organisation_id=?").bind(now,lead.id,org));
   } else if (intent === "not_interested") {
