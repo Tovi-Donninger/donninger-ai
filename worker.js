@@ -524,6 +524,7 @@ async function handleAdminMeetingDecision(request, env) {
 
   if(appointment.admin_accepted_at)return json({error:"Administrator approval has already been recorded."},409);
   if(appointment.availability_status==="no_available_options")return json({error:"All proposed times conflict with the organiser calendar. Ask the prospect for new options before approving."},409);
+  if(appointment.availability_status!=="available")return json({error:"Calendar availability has not been verified yet. Deploy the updated Google Apps Script and retry the availability check before approving."},409);
   const start=appointment.requested_start_at?new Date(appointment.requested_start_at):null;
   const timezone=String(appointment.prospect_timezone||appointment.timezone||"").trim();
   if(!appointment.email||!start||!Number.isFinite(start.getTime())||!timezone)return json({error:"The prospect email, proposed meeting time or timezone is missing or invalid."},400);
