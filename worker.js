@@ -523,6 +523,7 @@ async function handleAdminMeetingDecision(request, env) {
   }
 
   if(appointment.admin_accepted_at)return json({error:"Administrator approval has already been recorded."},409);
+  if(appointment.availability_status==="no_available_options")return json({error:"All proposed times conflict with the organiser calendar. Ask the prospect for new options before approving."},409);
   const start=appointment.requested_start_at?new Date(appointment.requested_start_at):null;
   const timezone=String(appointment.prospect_timezone||appointment.timezone||"").trim();
   if(!appointment.email||!start||!Number.isFinite(start.getTime())||!timezone)return json({error:"The prospect email, proposed meeting time or timezone is missing or invalid."},400);
@@ -1055,7 +1056,10 @@ async function handleSalesReplyIngest(request, env) {
     }
     meetingStart=selectedOption?selectedOption.start_iso:null;
     meetingTimezone=selectedOption?selectedOption.timezone:"";
-    outboundReply=meetingOptions.length?"Hi "+(lead.first_name||"there")+", "+nl+nl+"Thank you for suggesting meeting times. We have received your options and will check them with our team, starting with the earliest available time. We will send an official Google Calendar invitation once a time has been approved. No meeting has been booked yet."+nl+nl+"Kind regards,"+nl+"Tovi Donninger"+nl+"Founder, Donninger.AI":(suggestedReply||"Please suggest one or more suitable dates, times and your timezone for a short Zoom meeting.");
+    if(availabilityStatus==="no_available_options"){
+      try{await sendMeetingEmail(env,{action:"send_meeting_admin_notification",message:"All proposed meeting options conflict with the Donninger.AI organiser calendar. Manual scheduling is required.\n\nLead: "+(lead.first_name||"")+" "+(lead.last_name||"")+"\nEmail: "+lead.email+"\nOptions: "+JSON.stringify(meetingOptions)});}catch(error){console.error("Could not notify admin about meeting conflicts:",error);}
+    }
+    outboundReply=meetingOptions.length?"Hi "+(lead.first_name||"there")+", "+String.fromCharCode(10,10)+"Thank you for suggesting meeting times. We have received your options and will check them with our team, starting with the earliest available time. We will send an official Google Calendar invitation once a time has been approved. No meeting has been booked yet."+String.fromCharCode(10,10)+"Kind regards,"+String.fromCharCode(10)+"Tovi Donninger"+String.fromCharCode(10)+"Founder, Donninger.AI":(suggestedReply||"Please suggest one or more suitable dates, times and your timezone for a short Zoom meeting.");
     const meetingNow=new Date().toISOString(),optionsJson=JSON.stringify(meetingOptions);
     if(active){
       statements.push(env.DB.prepare("UPDATE sales_appointments SET requested_start_at=?,confirmed_start_at=NULL,duration_minutes=?,prospect_timezone=?,meeting_options_json=?,availability_status=?,prospect_accepted_at=NULL,admin_accepted_at=NULL,confirmation_email_sent_at=NULL,discussion_summary=?,updated_at=? WHERE id=? AND organisation_id=? AND status=?").bind(meetingStart,meetingDuration,meetingTimezone,optionsJson,availabilityStatus,meetingSummary,meetingNow,meetingAppointmentId,org,"requested"));
