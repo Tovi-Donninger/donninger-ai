@@ -135,6 +135,9 @@ async function loadSalesAppointments(){
      const name=(v.first_name+" "+(v.last_name||"")).trim();
      const date=v.requested_start_at?new Date(v.requested_start_at).toLocaleString():"Time not yet proposed";
      const timezone=v.prospect_timezone||v.timezone||"Timezone not specified";
+     let options=[];try{options=JSON.parse(v.meeting_options_json||"[]");if(!Array.isArray(options))options=[];}catch{options=[];}
+     const optionsHtml=options.length?'<p><strong>All proposed options (earliest first):</strong></p><ul>'+options.map(o=>'<li>'+escapeHtml(new Date(o.start_iso).toLocaleString(undefined,{timeZone:o.timezone||timezone}))+' · '+escapeHtml(o.timezone||timezone)+'</li>').join('')+'</ul>':'';
+     const availabilityLabel=v.availability_status==="available"?"Earliest available option checked":v.availability_status==="no_available_options"?"All proposed options conflict":v.availability_status==="needs_clarification"?"More date/time details required":"Calendar availability not checked yet";
      const email=v.latest_email_body?'<p>'+escapeHtml(v.latest_email_body.slice(0,500))+'</p>':"";
      return '<article class="sales-pipeline-lead">'+
       '<strong>'+escapeHtml(name)+'</strong>'+
@@ -142,6 +145,8 @@ async function loadSalesAppointments(){
       '<p><strong>Proposed time:</strong> '+escapeHtml(date)+'</p>'+
       (v.discussion_summary?'<p><strong>Client proposal:</strong> '+escapeHtml(v.discussion_summary)+'</p>':"")+
       '<small>Timezone: '+escapeHtml(timezone)+'</small>'+
+      '<small>'+escapeHtml(availabilityLabel)+'</small>'+
+      optionsHtml+
       '<p><strong>Latest email:</strong> '+escapeHtml(v.latest_email_subject||"No email subject")+'</p>'+
       email+
       '<small>Admin approval: '+(v.admin_accepted_at?"Recorded":"Not yet recorded")+
