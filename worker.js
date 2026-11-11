@@ -607,7 +607,11 @@ async function handleCalendarRsvp(request,env){
   const appointment=await env.DB.prepare("SELECT a.id,a.lead_id,a.status,a.admin_accepted_at,l.email FROM sales_appointments a JOIN leads l ON l.id=a.lead_id WHERE a.id=? AND a.organisation_id=?").bind(id,org).first();
   if(!appointment||String(appointment.email||"").toLowerCase()!==email)return json({error:"The appointment or guest email could not be verified."},404);
   if(!appointment.admin_accepted_at)return json({error:"The administrator has not approved this meeting."},409);
-  if(appointment.status==="confirmed"&&rsvp==="accepted")return json({success:true,duplicate:true,status:"confirmed"});
+  if(appointment.status==="confirmed"&&rsvp==="accepted"){
+    const now=new Date().toISOString();
+    await env.DB.prepare("UPDATE leads SET pipeline_stage='meeting_confirmed',status='proposal',updated_at=? WHERE id=? AND organisation_id=?").bind(now,appointment.lead_id,org).run();
+    return json({success:true,duplicate:true,status:"confirmed",pipeline_stage:"meeting_confirmed"});
+  }
   if(appointment.status!=="requested")return json({success:true,ignored:true,status:appointment.status});
   const now=new Date().toISOString();
   if(rsvp==="accepted"){
