@@ -202,7 +202,7 @@
 .sales-pipeline-lead .sales-email-history p{font-size:10px;overflow-wrap:anywhere}
 .sales-appointments-card{margin-top:18px}
 @media(max-width:850px){.sales-pipeline-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:600px){.sales-pipeline-toolbar{align-items:stretch;flex-direction:column}.sales-pipeline-filter{justify-content:space-between}.sales-pipeline-filter select{flex:1;min-width:0}.sales-pipeline-summary{gap:7px}.sales-pipeline-metric{padding:11px}.sales-pipeline-metric strong{font-size:21px}
+@media(max-width:600px){.sales-pipeline-toolbar{align-items:stretch;flex-direction:column}.sales-pipeline-filter{justify-content:space-between}.sales-pipeline-filter select{flex:1;min-width:0}.sales-pipeline-summary{gap:7px}.sales-pipeline-metric{padding:11px}.sales-pipeline-metric strong{font-size:21px}}
 
 /* Donninger.AI CRM pipeline: full-width data table and contextual lead drawer */
 .sales-pipeline-card{width:100%;box-sizing:border-box;padding:clamp(18px,2vw,28px)}
