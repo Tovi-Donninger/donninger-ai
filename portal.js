@@ -194,7 +194,8 @@ async function openSalesLeadDrawer(leadId){
   '<label class="lead-drawer-stage">Pipeline stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(lead.lead_id)+'">'+stageOptions.map(([value,label])=>'<option value="'+value+'" '+(lead.pipeline_stage===value?"selected":"")+'>'+label+'</option>').join("")+'</select></label></section>'+
   '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Appointments</h3></div>'+salesAppointmentMarkup(lead)+'</section>'+
   '<section class="lead-drawer-section lead-drawer-email-section" id="leadEmailConversation"><div class="lead-drawer-section-heading"><div><div class="dash-eyebrow">CONVERSATION TIMELINE</div><h3>Email conversation</h3><p>Full incoming and outgoing email messages, in chronological order.</p></div><button type="button" class="portal-button portal-button-secondary sales-email-history-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Load conversation ↓</button></div><div class="sales-email-history lead-drawer-email-history" hidden></div></section>'+
-  '<section class="lead-drawer-section"><h3>Sales notes</h3><p class="lead-drawer-muted">The original enquiry and recorded email analysis are shown above. Use the lead database to update the contact record.</p></section>';
+  '<section class="lead-drawer-section"><h3>Sales notes</h3><p class="lead-drawer-muted">The original enquiry and recorded email analysis are shown above. Use the lead database to update the contact record.</p></section>'+
+  (lead.pipeline_stage==="meeting_confirmed"&&lead.appointment_status==="confirmed"&&lead.admin_accepted_at&&lead.prospect_accepted_at?'<section class="lead-drawer-section meeting-prep-report-section" id="meetingPrepReportSection"><div class="lead-drawer-section-heading"><div><div class="dash-eyebrow">MEETING INTELLIGENCE</div><h3>Meeting preparation</h3></div></div><div id="meetingPrepReport" class="meeting-prep-report" hidden></div></section><div class="meeting-prep-footer"><button type="button" class="portal-button portal-button-primary meeting-prep-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Prepare for meeting <span>✦</span></button><p class="meeting-prep-status" id="meetingPrepStatus" role="status"></p></div>':"");
  document.querySelectorAll(".sales-pipeline-row").forEach(row=>row.removeAttribute("aria-current"));document.querySelector('.sales-pipeline-row[data-lead-id="'+CSS.escape(String(leadId))+'"]')?.setAttribute("aria-current","true");overlay.hidden=false;document.body.classList.add("sales-drawer-open");
  content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
 }
@@ -300,6 +301,27 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
  const pipelineRow=e.target.closest(".sales-pipeline-row");
  if(pipelineRow){openSalesLeadDrawer(pipelineRow.dataset.leadId);return;}
  if(e.target.closest(".lead-drawer-close")){closeSalesLeadDrawer();return;}
+ const prepareButton=e.target.closest(".meeting-prep-button");
+ if(prepareButton){
+  const leadId=prepareButton.dataset.leadId,status=document.getElementById("meetingPrepStatus"),report=document.getElementById("meetingPrepReport");
+  if(!leadId||!status||!report)return;
+  prepareButton.disabled=true;prepareButton.innerHTML='Preparing meeting brief <span class="meeting-prep-spinner" aria-hidden="true"></span>';status.textContent="Reviewing the lead record, qualification and recorded email correspondence…";report.hidden=true;report.innerHTML="";
+  try{
+   const response=await fetch("/api/sales/meeting-preparation",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},cache:"no-store",body:JSON.stringify({lead_id:leadId})});
+   const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not prepare the meeting brief.");
+   const sections=data.report||{};
+   const blocks=[["Lead overview",sections.lead_overview],["Qualification assessment",sections.qualification_summary],["Email correspondence",sections.email_correspondence],["Meeting objectives",sections.meeting_objectives],["Suggested discovery questions",sections.discovery_questions],["Recommended agenda",sections.recommended_agenda]];
+   report.innerHTML=blocks.map(([title,value])=>'<section><h4>'+escapeHtml(title)+'</h4><p>'+escapeHtml(Array.isArray(value)?value.map((v,i)=>(i+1)+'. '+v).join("\n"):value||"Not available in the recorded information.")+'</p></section>').join("")+'<p class="meeting-prep-generated">Generated from the lead record and recorded correspondence · '+escapeHtml(new Date(data.generated_at||Date.now()).toLocaleString())+'</p><button type="button" class="portal-button portal-button-secondary meeting-prep-copy">Copy meeting brief</button>';
+   report.hidden=false;status.textContent="Meeting brief ready.";
+  }catch(error){status.textContent=error.message;}
+  finally{prepareButton.disabled=false;prepareButton.innerHTML='Prepare for meeting <span>✦</span>';}
+  return;
+ }
+ if(e.target.closest(".meeting-prep-copy")){
+  const report=document.getElementById("meetingPrepReport");
+  if(report){const text=[...report.querySelectorAll("section")].map(section=>section.querySelector("h4").textContent+"\n"+section.querySelector("p").textContent).join("\n\n");try{await navigator.clipboard.writeText(text);e.target.closest(".meeting-prep-copy").textContent="Copied";}catch{const status=document.getElementById("meetingPrepStatus");if(status)status.textContent="Clipboard access was blocked by the browser.";}}
+  return;
+ }
  if(e.target.id==="salesLeadDrawerOverlay"){closeSalesLeadDrawer();return;}
 
  const editButton=e.target.closest(".edit-lead-button");
