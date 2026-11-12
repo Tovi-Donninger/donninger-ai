@@ -181,7 +181,7 @@ async function openSalesLeadDrawer(leadId){
   const response=await fetch("/api/sales/leads?id="+encodeURIComponent(leadId),{credentials:"same-origin",cache:"no-store"});
   const data=await response.json();
   if(!response.ok)throw new Error(data.error||"Full lead details are not available.");
-  if(data.lead)lead={...data.lead,...lead};
+  if(data.lead)lead={...lead,...data.lead};
  }catch(error){detailWarning=error.message;}
  if(requestId!==salesDrawerRequest)return;
  const name=(lead.first_name+" "+(lead.last_name||"")).trim()||"Unnamed lead";
@@ -195,7 +195,7 @@ async function openSalesLeadDrawer(leadId){
   '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Appointments</h3></div>'+salesAppointmentMarkup(lead)+'</section>'+
   '<section class="lead-drawer-section lead-drawer-email-section" id="leadEmailConversation"><div class="lead-drawer-section-heading"><div><div class="dash-eyebrow">CONVERSATION TIMELINE</div><h3>Email conversation</h3><p>Full incoming and outgoing email messages, in chronological order.</p></div><button type="button" class="portal-button portal-button-secondary sales-email-history-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Load conversation ↓</button></div><div class="sales-email-history lead-drawer-email-history" hidden></div></section>'+
   '<section class="lead-drawer-section"><h3>Sales notes</h3><p class="lead-drawer-muted">The original enquiry and recorded email analysis are shown above. Use the lead database to update the contact record.</p></section>'+
-  (lead.pipeline_stage==="meeting_confirmed"&&lead.appointment_status==="confirmed"?'<section class="lead-drawer-section meeting-prep-report-section" id="meetingPrepReportSection"><div class="lead-drawer-section-heading"><div><div class="dash-eyebrow">MEETING INTELLIGENCE</div><h3>Meeting preparation</h3></div></div><div id="meetingPrepReport" class="meeting-prep-report" hidden></div></section><div class="meeting-prep-footer"><button type="button" class="portal-button portal-button-primary meeting-prep-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Prepare for meeting <span>✦</span></button><p class="meeting-prep-status" id="meetingPrepStatus" role="status"></p></div>':"");
+  (lead.appointment_status==="confirmed"?'<section class="lead-drawer-section meeting-prep-report-section" id="meetingPrepReportSection"><div class="lead-drawer-section-heading"><div><div class="dash-eyebrow">MEETING INTELLIGENCE</div><h3>Meeting preparation</h3></div></div><div id="meetingPrepReport" class="meeting-prep-report" hidden></div></section><div class="meeting-prep-footer"><button type="button" class="portal-button portal-button-primary meeting-prep-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Prepare for meeting <span>✦</span></button><p class="meeting-prep-status" id="meetingPrepStatus" role="status"></p></div>':"");
  document.querySelectorAll(".sales-pipeline-row").forEach(row=>row.removeAttribute("aria-current"));document.querySelector('.sales-pipeline-row[data-lead-id="'+CSS.escape(String(leadId))+'"]')?.setAttribute("aria-current","true");overlay.hidden=false;document.body.classList.add("sales-drawer-open");
  content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
 }
