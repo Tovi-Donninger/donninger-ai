@@ -388,7 +388,8 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   }
   const historyButton=e.target.closest(".sales-email-history-button");
   if(historyButton){
-   const panel=historyButton.nextElementSibling,leadId=historyButton.dataset.leadId;
+   const section=historyButton.closest(".lead-drawer-email-section"),panel=section?.querySelector(".sales-email-history"),leadId=historyButton.dataset.leadId;
+   if(!panel){historyButton.disabled=false;historyButton.textContent="Email history unavailable";return;}
    if(historyButton.dataset.loaded==="true"){panel.hidden=!panel.hidden;historyButton.textContent=panel.hidden?"Show conversation ↓":"Hide conversation ↑";return;}
    panel.hidden=false;panel.innerHTML='<div class="lead-email-loading"><span></span>Loading the complete email conversation…</div>';historyButton.disabled=true;
    try{
