@@ -267,8 +267,8 @@
 
 
 /* Compact secondary action, matching the portal's understated navy/blue controls */
-.sales-pipeline-table .sales-row-open{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:0;padding:7px 11px;margin:0;border:1px solid #dce6f0;border-radius:7px;background:#f5f8fc;color:#2d5e8d;font:700 10px var(--font);letter-spacing:0;white-space:nowrap;cursor:pointer;box-shadow:none;transition:background .15s ease,border-color .15s ease,color .15s ease}
-.sales-pipeline-table .sales-row-open:hover{background:#edf5ff;border-color:#b9d1ef;color:#24558b;box-shadow:0 2px 6px rgba(35,65,100,.07)}
-.sales-pipeline-table .sales-row-open:focus-visible{outline:2px solid #9fc2f3;outline-offset:2px}
-.sales-pipeline-table .sales-row-open:active{background:#e5effb;box-shadow:none}
-.sales-pipeline-table .sales-row-open span{font-size:12px;line-height:1}
+.sales-pipeline-table button.sales-row-open{display:inline-flex;align-items:center;justify-content:flex-start;gap:5px;min-width:0;padding:3px 0;margin:0;border:0;border-radius:0;background:transparent;color:#3478f6;font:700 10px var(--font);letter-spacing:0;white-space:nowrap;cursor:pointer;box-shadow:none;text-decoration:none;transition:color .15s ease}
+.sales-pipeline-table button.sales-row-open:hover{background:transparent;border:0;color:#1d4f91;box-shadow:none;text-decoration:underline;text-underline-offset:3px}
+.sales-pipeline-table button.sales-row-open:focus-visible{outline:2px solid #9fc2f3;outline-offset:3px;border-radius:3px}
+.sales-pipeline-table button.sales-row-open:active{background:transparent;box-shadow:none}
+.sales-pipeline-table button.sales-row-open span{font-size:12px;line-height:1}
