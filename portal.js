@@ -118,13 +118,19 @@ function addLeadTableSearch(host,placeholder){
  host.insertBefore(search,host.firstChild);
 }
 
+function updateNewLeadSelection(){
+ const boxes=[...document.querySelectorAll(".new-lead-select")],selected=boxes.filter(box=>box.checked).length;
+ const master=document.getElementById("selectAllNewLeads"),button=document.getElementById("qualifySelectedLeads");
+ if(master){master.checked=boxes.length>0&&selected===boxes.length;master.indeterminate=selected>0&&selected<boxes.length;}
+ if(button){button.disabled=selected===0;button.innerHTML="Qualify Selected Leads ("+selected+") <span>✦</span>";}
+}
 async function loadSalesLeads(){
  const count=document.getElementById("salesLeadCount"),table=document.getElementById("salesLeadTable");if(!count||!table)return;
  count.textContent="Loading leads…";table.innerHTML="";
  try{const response=await fetch("/api/sales/leads",{credentials:"same-origin"});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not load leads.");
  const leads=result.leads||[];count.textContent=leads.length+" new lead"+(leads.length===1?"":"s")+" awaiting qualification";
  if(!leads.length){table.innerHTML='<div class="sales-empty">No leads yet. Add your first prospect using the form above.</div>';return;}
- table.innerHTML='<table class="sales-lead-table"><thead><tr><th>Prospect</th><th>Company</th><th>Contact</th><th>Need</th><th>Stage</th><th>Permission</th></tr></thead><tbody>'+leads.map(l=>'<tr><td><strong>'+escapeHtml((l.first_name+" "+(l.last_name||"")).trim())+'</strong><small>'+escapeHtml(l.job_title||"")+'</small></td><td>'+escapeHtml(l.company||"—")+'</td><td>'+escapeHtml(l.email||l.phone||"—")+'</td><td>'+escapeHtml(l.customer_need||"Not recorded")+'</td><td><span class="sales-stage">'+escapeHtml(l.status)+'</span></td><td>'+escapeHtml((l.contact_permission||"unknown").replaceAll("_"," "))+'<button type="button" class="text-action edit-lead-button" data-lead-id="'+escapeHtml(l.id)+'">Edit</button></td></tr>').join("")+'</tbody></table>';
+ table.innerHTML='<div class="new-leads-toolbar"><label class="new-leads-select-all"><input type="checkbox" id="selectAllNewLeads"> <span>Select all</span></label><button type="button" class="portal-button portal-button-primary" id="qualifySelectedLeads" disabled>Qualify Selected Leads (0) <span>✦</span></button></div><table class="sales-lead-table"><thead><tr><th>Select</th><th>Prospect</th><th>Company</th><th>Contact</th><th>Need</th><th>Stage</th><th>Permission</th></tr></thead><tbody>'+leads.map(l=>'<tr><td><input type="checkbox" class="new-lead-select" aria-label="Select '+escapeHtml((l.first_name+" "+(l.last_name||"")).trim())+'" data-lead-id="'+escapeHtml(l.id)+'"></td><td><strong>'+escapeHtml((l.first_name+" "+(l.last_name||"")).trim())+'</strong><small>'+escapeHtml(l.job_title||"")+'</small></td><td>'+escapeHtml(l.company||"—")+'</td><td>'+escapeHtml(l.email||l.phone||"—")+'</td><td>'+escapeHtml(l.customer_need||"Not recorded")+'</td><td><span class="sales-stage">'+escapeHtml(l.status)+'</span></td><td>'+escapeHtml((l.contact_permission||"unknown").replaceAll("_"," "))+'<button type="button" class="text-action edit-lead-button" data-lead-id="'+escapeHtml(l.id)+'">Edit</button></td></tr>').join("")+'</tbody></table>';
   addLeadTableSearch(table,"Search new leads by name, company or email…");
  }catch(error){count.textContent="Unable to load leads";table.innerHTML='<div class="sales-empty">'+escapeHtml(error.message)+'</div>';}
 }
@@ -288,6 +294,9 @@ document.getElementById("functionDetailContent").addEventListener("submit",async
  try{const r=await fetch("/api/sales/qualification-profile",{method:"PUT",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({criteria:Object.fromEntries(new FormData(form).entries())})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save profile.");s.textContent="Saved · Profile version "+d.profile.version;}catch(err){s.textContent=err.message;}finally{b.disabled=false;}
 });
 document.getElementById("functionDetailContent").addEventListener("click",async e=>{
+ const masterNew=e.target.closest("#selectAllNewLeads");
+ if(masterNew){document.querySelectorAll(".new-lead-select").forEach(box=>box.checked=masterNew.checked);updateNewLeadSelection();return;}
+ if(e.target.closest(".new-lead-select")){updateNewLeadSelection();return;}
  const pipelineRow=e.target.closest(".sales-pipeline-row");
  if(pipelineRow){openSalesLeadDrawer(pipelineRow.dataset.leadId);return;}
  if(e.target.closest(".lead-drawer-close")){closeSalesLeadDrawer();return;}
@@ -437,8 +446,11 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   }catch(error){status.textContent=error.message;}
   finally{button.disabled=false;}
  }
- if(e.target.closest("#qualifyAllLeads")){
-  const b=document.getElementById("qualifyAllLeads"),desc=document.getElementById("qualifiedLeadDefinition"),status=document.getElementById("bulkQualificationStatus"),rules=document.getElementById("extractedQualificationRules"),summary=document.getElementById("bulkQualificationSummary");
+ if(e.target.closest("#qualifyAllLeads, #qualifySelectedLeads")){
+  const selectedButton=e.target.closest("#qualifySelectedLeads");
+  const selectedLeadIds=selectedButton?[...document.querySelectorAll(".new-lead-select:checked")].map(box=>box.dataset.leadId).filter(Boolean):[];
+  if(selectedButton&&!selectedLeadIds.length)return;
+  const b=selectedButton||document.getElementById("qualifyAllLeads"),desc=document.getElementById("qualifiedLeadDefinition"),status=document.getElementById("bulkQualificationStatus"),rules=document.getElementById("extractedQualificationRules"),summary=document.getElementById("bulkQualificationSummary");
   if(desc.value.trim().length<20){status.textContent="Please describe a qualified lead in at least 20 characters.";desc.focus();return;}
   b.disabled=true;b.textContent="Qualifying leads…";rules.innerHTML="";summary.innerHTML="";
   let elapsed=0,totalLeads=0,finalResult=null,streamError=null;
@@ -460,7 +472,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   };
   status.textContent="AI qualification is starting…";
   try{
-   const r=await fetch("/api/sales/qualify-batch",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",cache:"no-store",body:JSON.stringify({description:desc.value})});
+   const r=await fetch("/api/sales/qualify-batch",{method:"POST",headers:{"content-type":"application/json"},credentials:"same-origin",cache:"no-store",body:JSON.stringify({description:desc.value,...(selectedButton?{lead_ids:selectedLeadIds}:{})})});
    const contentType=r.headers.get("content-type")||"";
    if(!contentType.includes("application/x-ndjson")){const d=await r.json().catch(()=>({}));throw new Error(d.error||"The qualification service did not start.");}
    const reader=r.body.getReader(),decoder=new TextDecoder();let buffer="";
@@ -484,7 +496,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    const failed=(d.errors||[]).map(x=>'<li><strong>'+escapeHtml(x.name||x.lead_id||"Lead")+'</strong>: '+escapeHtml(x.error||"Unknown error")+'</li>').join("");
    summary.innerHTML=stats+'<p>Source database: '+escapeHtml(d.source_lead_count??d.checked)+' Lead Records · Model: '+escapeHtml(d.model||"Gemini")+'</p>'+(d.qualified_count?'<p>Qualified leads were saved to the separate database.</p>':'<p>No leads were confidently qualified. Check Needs Review before treating any prospect as unsuitable.</p>')+(review?'<details open><summary>Needs human review ('+(d.needs_review_count||0)+'</summary><ul>'+review+'</ul></details>':"")+(rejected?'<details open><summary>Unqualified ('+d.not_qualified_count+')</summary><ul>'+rejected+'</ul></details>':"")+(failed?'<details open><summary>Failed assessments ('+d.failed_count+')</summary><ul>'+failed+'</ul></details>':"");
    status.textContent="Qualification finished: "+d.checked+" records checked.";await loadSalesLeads();await loadQualifiedLeads();await loadReviewLeads();await loadUnqualifiedLeads();await loadSalesPipeline();
-  }catch(err){status.textContent=err.message;summary.innerHTML='<p class="qualification-error">'+escapeHtml(err.message)+'</p>';}finally{clearInterval(progressTimer);clearInterval(insightTimer);overlay.classList.add("qualification-loading-finished");setTimeout(()=>overlay.remove(),900);b.disabled=false;b.innerHTML='Qualify Leads <span>✦</span>';}
+  }catch(err){status.textContent=err.message;summary.innerHTML='<p class="qualification-error">'+escapeHtml(err.message)+'</p>';}finally{clearInterval(progressTimer);clearInterval(insightTimer);overlay.classList.add("qualification-loading-finished");setTimeout(()=>overlay.remove(),900);b.disabled=false;b.innerHTML=selectedButton?'Qualify Selected Leads (0) <span>✦</span>':'Qualify Leads <span>✦</span>';}
  }
  if(e.target.closest("#refreshQualifiedLeads"))loadQualifiedLeads();
  if(e.target.closest("#refreshUnqualifiedLeads"))loadUnqualifiedLeads();
