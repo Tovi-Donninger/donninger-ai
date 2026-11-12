@@ -9,6 +9,7 @@ const modules = [
  {id:"stock-logistics",icon:"▤",name:"Stock, Suppliers & Logistics",desc:"Monitor inventory, supplier communications, purchase preparation and delivery progress.",workflow:["Read inventory and order data from agreed systems","Monitor stock thresholds and supplier milestones","Prepare replenishment requests and supplier follow-ups","Track deliveries, discrepancies and stock reports"],automate:["Low-stock alerts and draft purchase orders","Supplier updates and delivery reminders","Verified stock record updates and reporting"],assist:["Demand forecasts and reorder suggestions","Supplier comparisons and discrepancy analysis"],integrations:["Inventory and warehouse systems","Supplier communication","Shipping and purchasing tools"],stage:"Workflow specification drafted"},
  {id:"management",icon:"▥",name:"Management & Reporting",desc:"Bring business information together, monitor KPIs and prepare management reports.",workflow:["Collect approved data from connected departments","Validate KPI definitions and highlight missing information","Refresh dashboards and recurring reports","Prepare summaries and action lists for management review"],automate:["Scheduled KPI collection and dashboard refresh","Recurring report packs and action reminders","Exception alerts and task tracking"],assist:["Performance summaries and variance explanations","Scenario drafts and management questions"],integrations:["CRM and sales systems","Finance and HR data","Operations and analytics platforms"],stage:"Workflow specification drafted"}
 ];
+let salesPipelineRows=[];
 const loginScreen=document.getElementById("loginScreen"),dashboardScreen=document.getElementById("dashboardScreen");
 const loginForm=document.getElementById("loginForm"),loginError=document.getElementById("loginError");
 function showDashboard(){loginScreen.hidden=true;dashboardScreen.hidden=false;renderCards();showView("overview");}
@@ -130,9 +131,10 @@ async function loadSalesLeads(){
 
 async function loadSalesPipeline(){
  const count=document.getElementById('salesPipelineCount'),host=document.getElementById('salesPipelineBoard');if(!host)return;count.textContent='Loading sales pipeline…';
- try{const r=await fetch('/api/sales/pipeline',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load sales pipeline.');const rows=d.pipeline_leads||[];count.textContent=rows.length+' leads currently in active sales stages';
+ try{const r=await fetch('/api/sales/pipeline',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load sales pipeline.');const rows=d.pipeline_leads||[];salesPipelineRows=rows;count.textContent=rows.length+' leads currently in active sales stages';
  const stages=[['contacted','Contacted Leads'],['meeting_requested','Meeting Requested'],['meeting_confirmed','Meeting Confirmed'],['meeting_completed','Meeting Completed'],['converted','Converted'],['lost','Lost']];
  host.innerHTML=stages.map(([stage,label])=>{const items=rows.filter(v=>v.pipeline_stage===stage);const options=stages.filter(([value])=>value!==stage).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('');return '<section class="sales-pipeline-column"><header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+(items.length?items.map(v=>'<article class="sales-pipeline-lead"><strong>'+escapeHtml((v.first_name+' '+(v.last_name||'')).trim())+'</strong><small>'+escapeHtml(v.company||'')+' · '+escapeHtml(v.email||'')+'</small><p>'+escapeHtml(v.customer_need||'No customer need recorded')+'</p>'+(v.pipeline_stage==="meeting_requested"&&v.appointment_id?(()=>{let opts=[];try{opts=JSON.parse(v.meeting_options_json||"[]");if(!Array.isArray(opts))opts=[];}catch{}const tz=v.prospect_timezone||v.appointment_timezone||"Timezone not specified";const availability=v.availability_status==="available"?"Selected time is available":v.availability_status==="no_available_options"?"All proposed options conflict":v.availability_status==="needs_clarification"?"More date/time details required":"Calendar availability not checked yet";const choices=opts.map((o,i)=>'<label class="meeting-option-choice"><input type="radio" name="meeting-option-'+escapeHtml(v.appointment_id)+'" value="'+i+'" '+(v.requested_start_at&&new Date(v.requested_start_at).getTime()===new Date(o.start_iso||0).getTime()?'checked':'')+' '+(v.admin_accepted_at?'disabled':'')+'><span>'+escapeHtml(o.original_text||"Option "+(i+1))+' — '+escapeHtml(o.start_iso?new Date(o.start_iso).toLocaleString(undefined,{timeZone:o.timezone||tz}):"Date/time unclear")+' ('+escapeHtml(o.timezone||tz)+')</span></label>').join('');return '<div class="meeting-pipeline-details"><p><strong>Meeting request:</strong> '+escapeHtml(v.discussion_summary||"Prospect requested a meeting")+'</p><p><strong>Availability:</strong> '+escapeHtml(availability)+'</p><p><strong>Selected time:</strong> '+escapeHtml(v.requested_start_at?new Date(v.requested_start_at).toLocaleString(undefined,{timeZone:tz}):"No time selected")+'</p><p><strong>Timezone:</strong> '+escapeHtml(tz)+'</p>'+(choices?'<fieldset class="meeting-option-list"><legend>Select a proposed time</legend>'+choices+'</fieldset>':'<p>The AI could not confidently extract a complete date, time and timezone. Review the email and ask the customer to clarify.</p>')+(!v.admin_accepted_at?'<button type="button" class="portal-button portal-button-secondary meeting-check-time-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'">Check selected time</button>':'')+'<p class="meeting-check-status">'+escapeHtml(v.availability_status==="available"?"Selected time is available":v.availability_status==="not_available"?"Selected time is unavailable":"Select an option and check availability")+'</p>'+(v.appointment_status==="requested"&&!v.admin_accepted_at&&v.availability_status==="available"&&v.requested_start_at?'<div class="meeting-approval-actions"><button type="button" class="portal-button portal-button-primary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="accept">Approve &amp; send invitation</button><button type="button" class="portal-button portal-button-secondary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="decline">Decline</button></div>':"")+(v.admin_accepted_at?'<p>Donninger support approval recorded. Waiting for the customer to accept the Calendar invitation.</p>':"")+'</div>'})():"")+'<label>Update stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(v.lead_id)+'"><option value="'+stage+'" selected>'+label+'</option>'+options+'</select></label><button type="button" class="sales-email-history-button" data-lead-id="'+escapeHtml(v.lead_id)+'">View email history</button><div class="sales-email-history" hidden></div></article>').join(''):'<div class="sales-empty-state">No leads in this stage.</div>')+'</section>';}).join('');
+ renderSalesPipeline();
  }catch(e){count.textContent='Unable to load pipeline';host.textContent=e.message;}
 }
 
@@ -451,4 +453,31 @@ function showSalesView(view){
  const names={pipeline:"Sales Pipeline", "lead-capture":"Lead Capture",databases:"Databases"};
  document.getElementById("currentSection").textContent=names[view]||"Sales Pipeline";
  document.getElementById("sidebar").classList.remove("open");
+}
+
+function renderSalesPipeline(){
+ const host=document.getElementById("salesPipelineBoard");if(!host)return;
+ const search=(document.getElementById("salesPipelineSearch")?.value||"").trim().toLowerCase();
+ const filter=document.getElementById("salesPipelineFilter")?.value||"all";
+ const metrics=[["Active prospects",salesPipelineRows.length],["Meetings requested",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_requested").length],["Meetings confirmed",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_confirmed").length],["Converted",salesPipelineRows.filter(v=>v.pipeline_stage==="converted").length]];
+ const summary=document.getElementById("salesPipelineSummary");
+ if(summary)summary.innerHTML=metrics.map(([label,value])=>'<div class="sales-pipeline-metric"><span>'+label+'</span><strong>'+value+'</strong></div>').join("");
+ let visible=0;
+ host.querySelectorAll(".sales-pipeline-column").forEach(column=>{
+  const header=column.querySelector("header strong")?.textContent||"";
+  const stageMap={"Contacted Leads":"contacted","Meeting Requested":"meeting_requested","Meeting Confirmed":"meeting_confirmed","Meeting Completed":"meeting_completed","Converted":"converted","Lost":"lost"};
+  const stage=stageMap[header]||"";
+  let inColumn=0;
+  column.querySelectorAll(".sales-pipeline-lead").forEach(card=>{
+   const select=card.querySelector(".pipeline-stage-select");
+   const cardStage=select?.value||stage;
+   const matchesSearch=!search||card.textContent.toLowerCase().includes(search);
+   const matchesStage=filter==="all"||cardStage===filter;
+   card.hidden=!(matchesSearch&&matchesStage);if(!card.hidden){visible++;inColumn++;}
+  });
+  const count=column.querySelector("header span");if(count)count.textContent=String(inColumn);
+  column.hidden=filter!=="all"&&stage!==filter;
+ });
+ const count=document.getElementById("salesPipelineCount");
+ if(count)count.textContent=visible+" prospect"+(visible===1?"":"s")+" shown"+(search||filter!=="all"?" after filters":" in the pipeline");
 }
