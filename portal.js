@@ -320,7 +320,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not prepare the meeting brief.");
    const sections=data.report||{};
    const blocks=[["Lead overview",sections.lead_overview],["Qualification assessment",sections.qualification_summary],["Email correspondence",sections.email_correspondence],["Meeting objectives",sections.meeting_objectives],["Suggested discovery questions",sections.discovery_questions],["Recommended agenda",sections.recommended_agenda]];
-   report.innerHTML=blocks.map(([title,value])=>'<section><h4>'+escapeHtml(title)+'</h4><p>'+escapeHtml(Array.isArray(value)?value.map((v,i)=>(i+1)+'. '+v).join("\n"):value||"Not available in the recorded information.")+'</p></section>').join("")+'<p class="meeting-prep-generated">Generated from the lead record and recorded correspondence · '+escapeHtml(new Date(data.generated_at||Date.now()).toLocaleString())+'</p><button type="button" class="portal-button portal-button-secondary meeting-prep-copy">Copy meeting brief</button>';
+   report.innerHTML=blocks.map(([title,value])=>'<section><h4>'+escapeHtml(title)+'</h4><p>'+escapeHtml(Array.isArray(value)?value.map((v,i)=>(i+1)+'. '+v).join("\n"):value||"Not available in the recorded information.")+'</p></section>').join("")+'<p class="meeting-prep-generated">Generated from the lead record and recorded correspondence · '+escapeHtml(new Date(data.generated_at||Date.now()).toLocaleString())+'</p><div class="meeting-prep-actions"><button type="button" class="portal-button portal-button-primary meeting-prep-email" data-lead-id="'+escapeHtml(leadId)+'">Email sales leader</button><button type="button" class="portal-button portal-button-secondary meeting-prep-download">Download PDF</button><button type="button" class="portal-button portal-button-secondary meeting-prep-copy">Copy meeting brief</button></div>';
    report.hidden=false;status.textContent="Meeting brief ready.";
   }catch(error){status.textContent=error.message;}
   finally{prepareButton.disabled=false;prepareButton.innerHTML='Prepare for meeting <span>✦</span>';}
@@ -330,9 +330,31 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   e.target.closest("#meetingPrepModal")?.remove();
   return;
  }
+ if(e.target.closest(".meeting-prep-email")){
+  const button=e.target.closest(".meeting-prep-email"),modal=button.closest("#meetingPrepModal"),report=modal?.querySelector("#meetingPrepReport"),status=modal?.querySelector("#meetingPrepModalStatus");
+  if(!report||!status)return;
+  const sections=[...report.querySelectorAll("section")],getText=title=>sections.find(section=>section.querySelector("h4")?.textContent===title)?.querySelector("p")?.textContent||"";
+  const asList=title=>getText(title).split("\n").map(line=>line.replace(/^\d+\.\s*/,"").trim()).filter(Boolean);
+  const payload={lead_id:button.dataset.leadId,report:{lead_overview:getText("Lead overview"),qualification_summary:getText("Qualification assessment"),email_correspondence:getText("Email correspondence"),meeting_objectives:asList("Meeting objectives"),discovery_questions:asList("Suggested discovery questions"),recommended_agenda:asList("Recommended agenda")}};
+  button.disabled=true;button.textContent="Sending email…";status.textContent="Sending the meeting brief to the logged-in sales leader…";
+  try{const response=await fetch("/api/sales/meeting-preparation/email",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},cache:"no-store",body:JSON.stringify(payload)});const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not email the meeting brief.");button.textContent="Email sent";status.textContent="Meeting brief emailed to "+result.recipient+".";}
+  catch(error){button.disabled=false;button.textContent="Email sales leader";status.textContent=error.message;}
+  return;
+ }
+ if(e.target.closest(".meeting-prep-download")){
+  const modal=e.target.closest("#meetingPrepModal"),report=modal?.querySelector("#meetingPrepReport");
+  if(!report)return;
+  const printWindow=window.open("","_blank");
+  if(!printWindow){const status=modal.querySelector("#meetingPrepModalStatus");if(status)status.textContent="Your browser blocked the PDF window. Allow pop-ups for this site and try again.";return;}
+  const title=modal.querySelector("#meetingPrepModalTitle")?.textContent||"Meeting preparation";
+  const sections=[...report.querySelectorAll("section")].map(section=>'<section><h2>'+escapeHtml(section.querySelector("h4")?.textContent||"")+'</h2><p>'+escapeHtml(section.querySelector("p")?.textContent||"").replace(/\n/g,"<br>")+'</p></section>').join("");
+  printWindow.document.write('<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(title)+'</title><style>body{font:14px Arial,sans-serif;color:#24364b;max-width:850px;margin:40px auto;padding:0 28px;line-height:1.65}h1{font-size:25px;color:#173a5e;border-bottom:2px solid #dce5ef;padding-bottom:14px}h2{font-size:16px;color:#173a5e;margin:25px 0 8px}p{white-space:normal;margin:0;color:#34465a}.meta{margin-top:30px;color:#78899b;font-size:11px}@page{margin:18mm} @media print{body{margin:0;padding:0}}</style></head><body><h1>'+escapeHtml(title)+'</h1>'+sections+'<p class="meta">Prepared by Donninger.AI · '+escapeHtml(new Date().toLocaleString())+'</p><script>window.onload=function(){window.focus();window.print();};<\/script></body></html>');
+  printWindow.document.close();
+  return;
+ }
  if(e.target.closest(".meeting-prep-copy")){
-  const report=document.getElementById("meetingPrepReport");
-  if(report){const text=[...report.querySelectorAll("section")].map(section=>section.querySelector("h4").textContent+"\n"+section.querySelector("p").textContent).join("\n\n");try{await navigator.clipboard.writeText(text);e.target.closest(".meeting-prep-copy").textContent="Copied";}catch{const status=document.getElementById("meetingPrepStatus");if(status)status.textContent="Clipboard access was blocked by the browser.";}}
+  const report=document.getElementById("meetingPrepReport"),modal=e.target.closest("#meetingPrepModal"),status=modal?.querySelector("#meetingPrepModalStatus");
+  if(report){const text=[...report.querySelectorAll("section")].map(section=>section.querySelector("h4").textContent+"\n"+section.querySelector("p").textContent).join("\n\n");try{await navigator.clipboard.writeText(text);e.target.closest(".meeting-prep-copy").textContent="Copied";if(status)status.textContent="Meeting brief copied to clipboard.";}catch{if(status)status.textContent="Clipboard access was blocked by the browser.";}}
   return;
  }
  if(e.target.id==="salesLeadDrawerOverlay"){closeSalesLeadDrawer();return;}
