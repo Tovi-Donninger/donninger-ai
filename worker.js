@@ -852,7 +852,29 @@ async function handleSalesEmailHistory(request, env) {
     activities: activities.results || []
   });
 }
-async function handleSalesOutreachDrafts(request, env) {
+async function parseSalesEmailDraftOutput(value) {
+  let source = String(value || "").trim();
+  source = source.replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "").trim();
+  const first = source.indexOf("{"), last = source.lastIndexOf("}");
+  if (first < 0 || last < first) throw new Error("AI response did not contain a complete JSON object.");
+  source = source.slice(first, last + 1);
+  // Some model responses contain literal line breaks inside JSON strings.
+  // Escape those control characters without changing valid escaped sequences.
+  let repaired = "", inString = false, escaped = false;
+  for (let i = 0; i < source.length; i++) {
+    const ch = source[i], code = source.charCodeAt(i);
+    if (inString && !escaped && ch === '"') { inString = false; repaired += ch; continue; }
+    if (!inString && ch === '"') { inString = true; repaired += ch; continue; }
+    if (inString && !escaped && ch === "\\") { escaped = true; repaired += ch; continue; }
+    if (inString && code < 32) { repaired += ch === "\n" ? "\\n" : ch === "\r" ? "\\r" : ch === "\t" ? "\\t" : " "; escaped = false; continue; }
+    repaired += ch;
+    if (escaped) escaped = false;
+  }
+  if (inString) throw new Error("AI response ended before the email draft was complete.");
+  return JSON.parse(repaired);
+}
+
+function handleSalesOutreachDrafts(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
@@ -873,11 +895,11 @@ async function handleSalesOutreachDrafts(request, env) {
     let draft=null,lastError="";
     for(const candidate of [...new Set([model,"gemini-3.5-flash-lite","gemini-3.8-flash","gemini-3.5-flash"])]) {
       try {
-        const upstream=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(candidate)+":generateContent?key="+encodeURIComponent(env.GEMINI_API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,temperature:0.4,maxOutputTokens:700}})});
+        const upstream=await fetch("https://generativelanguage.googleapis.com/v1beta/models/"+encodeURIComponent(candidate)+":generateContent?key="+encodeURIComponent(env.GEMINI_API_KEY),{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({contents:[{role:"user",parts:[{text:prompt}]}],generationConfig:{responseMimeType:"application/json",responseSchema:schema,temperature:0.3,maxOutputTokens:1200}})});
         const result=await upstream.json().catch(()=>({}));
         if(!upstream.ok){lastError="AI provider HTTP "+upstream.status;if([429,500,502,503].includes(upstream.status))continue;break;}
         const output=result.candidates?.[0]?.content?.parts?.map(part=>part.text||"").join("")||"";
-        draft=JSON.parse(output);break;
+        draft=parseSalesEmailDraftOutput(output);break;
       } catch(error){lastError=String(error.message||error);}
     }
     if(!draft||!String(draft.subject||"").trim()||!String(draft.body||"").trim()){skipped.push({lead_id:leadId,reason:"AI could not prepare a valid draft. "+lastError});continue;}
