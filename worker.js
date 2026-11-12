@@ -576,15 +576,20 @@ async function handleAdminMeetingDecision(request, env) {
       name:[appointment.first_name,appointment.last_name].filter(Boolean).join(" ")||"there",
       company:appointment.company||"",
       meeting_time:start.toISOString(),
-      meeting_options:(()=>{try{const a=JSON.parse(appointment.meeting_options_json||"[]");return Array.isArray(a)&&a.length?a:[{start_iso:start.toISOString(),timezone:timezone,original_text:"Selected proposal"}];}catch{return [{start_iso:start.toISOString(),timezone:timezone,original_text:"Selected proposal"}];}})(),
+      // Send only the exact time the administrator selected and checked.
+      // Never let the Calendar service silently substitute another option.
+      meeting_options:(()=>{try{const a=JSON.parse(appointment.meeting_options_json||"[]");const selected=Array.isArray(a)?a.find(o=>new Date(o.start_iso).getTime()===start.getTime()&&String(o.timezone||"")===timezone):null;return [{start_iso:start.toISOString(),timezone:timezone,original_text:String(selected?.original_text||"Selected proposal")}];}catch{return [{start_iso:start.toISOString(),timezone:timezone,original_text:"Selected proposal"}];}})(),
       timezone:timezone,
       duration_minutes:Number(appointment.duration_minutes||30),
       summary:appointment.discussion_summary||"",
       admin_approved:true
     });
     if(booking.booked!==true)throw new Error(booking.message||"Google Calendar did not confirm the invitation.");
-    const selectedMeetingTime=String(booking.selected_meeting_time||start.toISOString());
-    const selectedTimezone=String(booking.selected_timezone||timezone);
+    const selectedMeetingTime=String(booking.selected_meeting_time||"");
+    const selectedTimezone=String(booking.selected_timezone||"");
+    if(!selectedMeetingTime||new Date(selectedMeetingTime).getTime()!==start.getTime()||selectedTimezone!==timezone){
+      throw new Error("Calendar service returned a meeting time or timezone different from the exact administrator-approved selection.");
+    }
     const sentAt=new Date().toISOString();
     await env.DB.batch([
       env.DB.prepare("UPDATE sales_appointments SET requested_start_at=?,prospect_timezone=?,availability_status='available',confirmation_email_sent_at=?,updated_at=? WHERE id=? AND organisation_id=? AND admin_accepted_at IS NOT NULL AND status='requested'").bind(selectedMeetingTime,selectedTimezone,sentAt,sentAt,id,org),
