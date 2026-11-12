@@ -264,3 +264,11 @@
 .lead-drawer-email-history .sales-email-entry p{margin:8px 0 0;color:#536a82;font-size:10px;line-height:1.6;overflow-wrap:anywhere;white-space:pre-wrap}
 .lead-drawer-email-history[hidden]{display:none!important}
 @media(max-width:700px){.sales-pipeline-table-wrap{max-height:calc(100vh - 390px)}.sales-lead-drawer{width:100%;padding:20px 17px 34px}.lead-drawer-info-grid,.lead-drawer-appointment dl{grid-template-columns:1fr}.lead-drawer-section-heading{align-items:flex-start}.lead-drawer-stage{grid-template-columns:1fr}}
+
+
+/* Clear, high-visibility action button in the sales pipeline */
+.sales-pipeline-table .sales-row-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:112px;padding:9px 14px;margin:0;border:1px solid #245fc4;border-radius:7px;background:#3478f6;color:#fff;font:700 11px var(--font);letter-spacing:.1px;white-space:nowrap;cursor:pointer;box-shadow:0 2px 5px rgba(35,91,170,.18);transition:background .15s ease,box-shadow .15s ease,transform .15s ease}
+.sales-pipeline-table .sales-row-open:hover{background:#245fc4;box-shadow:0 4px 10px rgba(35,91,170,.25);transform:translateY(-1px)}
+.sales-pipeline-table .sales-row-open:focus-visible{outline:3px solid rgba(52,120,246,.3);outline-offset:2px}
+.sales-pipeline-table .sales-row-open:active{transform:translateY(0);box-shadow:0 1px 2px rgba(35,91,170,.2)}
+.sales-pipeline-table .sales-row-open span{font-size:14px;line-height:1}
