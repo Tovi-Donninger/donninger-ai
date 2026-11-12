@@ -396,3 +396,19 @@
 .meeting-prep-spinner{width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:meetingPrepSpin .7s linear infinite}
 @keyframes meetingPrepSpin{to{transform:rotate(360deg)}}
 @media(max-width:640px){.meeting-prep-footer{margin-left:-18px;margin-right:-18px;padding-left:18px;padding-right:18px}}
+
+
+/* Meeting preparation pop-up, displayed above the lead drawer. */
+.meeting-prep-modal-overlay{position:fixed;inset:0;z-index:100020;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(10,24,42,.58);backdrop-filter:blur(4px);box-sizing:border-box}
+.meeting-prep-modal{width:min(760px,94vw);max-height:min(86vh,900px);overflow:auto;background:#fff;border:1px solid #e5ebf2;border-radius:16px;box-shadow:0 24px 90px rgba(8,22,40,.3);padding:26px 30px 30px;box-sizing:border-box}
+.meeting-prep-modal-header{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;padding-bottom:18px;border-bottom:1px solid #e8edf3}
+.meeting-prep-modal-header h2{margin:5px 0 5px;color:#193452;font:800 24px var(--display);letter-spacing:-.5px}
+.meeting-prep-modal-header p{margin:0;color:#75869b;font-size:12px;line-height:1.5}
+.meeting-prep-modal-close{flex:0 0 38px;width:38px;height:38px;border:0;border-radius:9px;background:#f1f4f8;color:#536b85;font-size:25px;cursor:pointer}
+.meeting-prep-modal-status{display:flex;align-items:center;gap:10px;margin:18px 0;color:#647991;font-size:12px;line-height:1.6}
+.meeting-prep-modal .meeting-prep-report{margin-top:18px;padding:0;border:0;background:transparent}
+.meeting-prep-modal .meeting-prep-report section{padding:0 0 17px;margin:0 0 17px}
+.meeting-prep-modal .meeting-prep-report h4{font-size:13px}
+.meeting-prep-modal .meeting-prep-report p{font-size:12px;line-height:1.75}
+.meeting-prep-modal .meeting-prep-copy{max-width:220px}
+@media(max-width:640px){.meeting-prep-modal-overlay{padding:10px}.meeting-prep-modal{width:100%;max-height:92vh;padding:20px 18px;border-radius:13px}.meeting-prep-modal-header h2{font-size:21px}}
