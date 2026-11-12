@@ -198,10 +198,7 @@ async function openSalesLeadDrawer(leadId){
   (lead.appointment_status==="confirmed"?'<div class="meeting-prep-footer"><button type="button" class="portal-button portal-button-primary meeting-prep-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Prepare for meeting <span>✦</span></button></div>':"");
  document.querySelectorAll(".sales-pipeline-row").forEach(row=>row.removeAttribute("aria-current"));document.querySelector('.sales-pipeline-row[data-lead-id="'+CSS.escape(String(leadId))+'"]')?.setAttribute("aria-current","true");overlay.hidden=false;document.body.classList.add("sales-drawer-open");
  content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
- content.querySelector(".meeting-prep-button")?.addEventListener("click",event=>{
-  event.preventDefault();event.stopPropagation();
-  prepareMeetingBrief(lead.lead_id,event.currentTarget);
- });
+
 }
 async function prepareMeetingBrief(leadId,prepareButton){
  if(!leadId||!prepareButton)return;
@@ -225,6 +222,25 @@ async function prepareMeetingBrief(leadId,prepareButton){
  }catch(error){status.textContent=error.message;}
  finally{prepareButton.disabled=false;prepareButton.innerHTML='Prepare for meeting <span>✦</span>';}
 }
+document.addEventListener("click",async event=>{
+ const prep=event.target.closest(".meeting-prep-button,.meeting-prep-row-button");
+ if(!prep)return;
+ event.preventDefault();event.stopPropagation();event.stopImmediatePropagation();
+ if(prep.classList.contains("meeting-prep-row-button")){
+  const leadId=prep.dataset.leadId;
+  prep.disabled=true;
+  try{
+   await openSalesLeadDrawer(leadId);
+   const drawerButton=document.querySelector("#salesLeadDrawerContent .meeting-prep-button");
+   if(!drawerButton)throw new Error("The meeting-preparation action could not be loaded for this lead.");
+   await prepareMeetingBrief(leadId,drawerButton);
+  }catch(error){const count=document.getElementById("salesPipelineCount");if(count)count.textContent=error.message;}
+  finally{prep.disabled=false;}
+  return;
+ }
+ await prepareMeetingBrief(prep.dataset.leadId,prep);
+},true);
+
 function closeSalesLeadDrawer(){
  salesDrawerRequest++;
  const overlay=document.getElementById("salesLeadDrawerOverlay");if(overlay)overlay.hidden=true;
@@ -604,6 +620,6 @@ function renderSalesPipeline(){
    const meeting=lead.appointment_id?(lead.appointment_status==="confirmed"||lead.prospect_accepted_at?"Meeting confirmed":lead.admin_accepted_at?"Awaiting customer confirmation":lead.availability_status==="available"?"Ready for approval":"Request received"):"No appointment";
    const activity=lead.latest_email_at||lead.last_activity_at||lead.updated_at||lead.created_at;
    const next=lead.appointment_id?(lead.appointment_status==="confirmed"||lead.prospect_accepted_at||lead.pipeline_stage==="meeting_confirmed"?"Prepare for meeting":lead.admin_accepted_at?"Await RSVP":"Review appointment"):lead.pipeline_stage==="contacted"?"Follow up":"Review lead";
-   return '<tr class="sales-pipeline-row" data-lead-id="'+escapeHtml(lead.lead_id)+'" tabindex="0" role="button" aria-label="Open '+escapeHtml(name)+' details"><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(lead.job_title||"")+'</small></td><td>'+escapeHtml(lead.company||"—")+'</td><td>'+escapeHtml(lead.email||lead.phone||"—")+'</td><td><span class="sales-stage">'+escapeHtml(salesStageLabel(lead.pipeline_stage))+'</span></td><td><span class="sales-appointment-status">'+escapeHtml(meeting)+'</span></td><td>'+escapeHtml(activity?new Date(activity).toLocaleDateString():"—")+'</td><td>'+escapeHtml(next)+'</td><td><button type="button" class="sales-row-open" data-lead-id="'+escapeHtml(lead.lead_id)+'" style="display:inline-flex!important;align-items:center!important;gap:6px!important;padding:7px 0!important;border:0!important;border-radius:0!important;background:transparent!important;color:#3478f6!important;font:700 11px var(--font)!important;box-shadow:none!important;text-decoration:none!important;cursor:pointer!important">View lead <span aria-hidden="true" style="font-size:14px!important">→</span></button></td></tr>';
+   return '<tr class="sales-pipeline-row" data-lead-id="'+escapeHtml(lead.lead_id)+'" tabindex="0" role="button" aria-label="Open '+escapeHtml(name)+' details"><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(lead.job_title||"")+'</small></td><td>'+escapeHtml(lead.company||"—")+'</td><td>'+escapeHtml(lead.email||lead.phone||"—")+'</td><td><span class="sales-stage">'+escapeHtml(salesStageLabel(lead.pipeline_stage))+'</span></td><td><span class="sales-appointment-status">'+escapeHtml(meeting)+'</span></td><td>'+escapeHtml(activity?new Date(activity).toLocaleDateString():"—")+'</td><td>'+(lead.appointment_status==="confirmed"?'<button type="button" class="text-action meeting-prep-row-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Prepare for meeting ✦</button>':escapeHtml(next))+'</td><td><button type="button" class="sales-row-open" data-lead-id="'+escapeHtml(lead.lead_id)+'" style="display:inline-flex!important;align-items:center!important;gap:6px!important;padding:7px 0!important;border:0!important;border-radius:0!important;background:transparent!important;color:#3478f6!important;font:700 11px var(--font)!important;box-shadow:none!important;text-decoration:none!important;cursor:pointer!important">View lead <span aria-hidden="true" style="font-size:14px!important">→</span></button></td></tr>';
   }).join("")+'</tbody></table>':'<div class="sales-empty-state">'+(salesPipelineRows.length?"No leads match these filters.":"No leads are currently in the sales pipeline.")+'</div>';
 }
