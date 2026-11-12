@@ -7,7 +7,7 @@
   <meta name="description" content="Donninger.AI client workspace and business automation dashboard.">
   <title>Client Workspace | Donninger.AI</title>
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
-  <link rel="stylesheet" href="portal.css?v=20261110-lead-edit">
+  <link rel="stylesheet" href="portal.css?v=20261112-sales-workspace">
 </head>
 <body class="portal-body">
   <main id="loginScreen" class="login-screen">
@@ -37,15 +37,25 @@
   <main id="dashboardScreen" class="dashboard-shell" hidden>
     <aside class="sidebar" id="sidebar">
       <a class="portal-brand sidebar-brand" href="index.html"><span class="brand-mark">D</span> DONNINGER<span>.AI</span></a>
-      <div class="workspace-label">WORKSPACE</div>
-      <button class="side-link active" data-view="overview"><span>⌂</span> Overview</button>
-      <button class="side-link" data-view="functions"><span>▦</span> Automation functions</button>
-      <button class="side-link" data-view="assessments"><span>⌕</span> Assessments & reports</button>
-      <div class="workspace-label side-spaced">BUSINESS MANAGEMENT</div>
-      <button class="side-link" data-view="clients"><span>♙</span> Clients</button>
-      <button class="side-link" data-view="integrations"><span>⌘</span> Integrations</button>
-      <button class="side-link" data-view="activity"><span>◷</span> Activity & tasks</button>
-      <button class="side-link" data-view="settings"><span>⚙</span> Settings</button>
+      <div id="globalSidebarNav">
+        <div class="workspace-label">WORKSPACE</div>
+        <button class="side-link active" data-view="overview"><span>⌂</span> Overview</button>
+        <button class="side-link" data-view="functions"><span>▦</span> Automation functions</button>
+        <button class="side-link" data-view="assessments"><span>⌕</span> Assessments & reports</button>
+        <div class="workspace-label side-spaced">BUSINESS MANAGEMENT</div>
+        <button class="side-link" data-view="clients"><span>♙</span> Clients</button>
+        <button class="side-link" data-view="integrations"><span>⌘</span> Integrations</button>
+        <button class="side-link" data-view="activity"><span>◷</span> Activity & tasks</button>
+        <button class="side-link" data-view="settings"><span>⚙</span> Settings</button>
+      </div>
+      <div id="salesSidebarNav" hidden>
+        <div class="workspace-label">SALES & LEAD GENERATION</div>
+        <button class="side-link sales-side-link" data-sales-view="overview"><span>⌂</span> Overview</button>
+        <div class="workspace-label side-spaced">SALES WORKSPACE</div>
+        <button class="side-link sales-side-link" data-sales-view="pipeline"><span>↗</span> Sales Pipeline</button>
+        <button class="side-link sales-side-link" data-sales-view="lead-capture"><span>＋</span> Lead Capture</button>
+        <button class="side-link sales-side-link" data-sales-view="databases"><span>▤</span> Databases</button>
+      </div>
       <div class="sidebar-bottom"><div class="dev-profile"><span class="avatar">A</span><span><strong>Development Admin</strong><small>Full platform access</small></span></div><button id="logoutButton" class="logout-button">Sign out ↗</button></div>
     </aside>
 
@@ -93,6 +103,6 @@
       </div>
     </section>
   </main>
-  <script src="portal.js?v=20261111-select-meeting-time-v1"></script>
+  <script src="portal.js?v=20261112-sales-workspace"></script>
 </body>
 </html>
