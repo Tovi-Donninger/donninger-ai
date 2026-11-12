@@ -611,7 +611,12 @@ async function handleCalendarRsvp(request,env){
   const id=String(body.appointment_id||"").trim();
   const email=String(body.email||"").trim().toLowerCase();
   const rsvp=String(body.rsvp_status||"").trim().toLowerCase();
+  const receiptVerified=body.google_receipt_verified===true;
+  const receiptMessageId=String(body.google_receipt_message_id||"").trim();
+  const receiptSubject=String(body.google_receipt_subject||"").trim();
+  const receiptFrom=String(body.google_receipt_from||"").trim();
   if(!id||!email||!["accepted","declined","tentative","invited"].includes(rsvp))return json({error:"A valid appointment, guest email and RSVP status are required."},400);
+  if(rsvp==="accepted"&&(!receiptVerified||!receiptMessageId||!/^Accepted\\s*:/i.test(receiptSubject)||!receiptFrom))return json({error:"The Google Calendar acceptance receipt could not be verified. The meeting has not been moved to confirmed."},400);
   const org="dev-donninger";
   const appointment=await env.DB.prepare("SELECT a.id,a.lead_id,a.status,a.admin_accepted_at,l.email FROM sales_appointments a JOIN leads l ON l.id=a.lead_id WHERE a.id=? AND a.organisation_id=?").bind(id,org).first();
   if(!appointment||String(appointment.email||"").toLowerCase()!==email)return json({error:"The appointment or guest email could not be verified."},404);
@@ -628,7 +633,7 @@ async function handleCalendarRsvp(request,env){
     if(!changed.meta||changed.meta.changes!==1)return json({error:"The appointment changed before the RSVP could be recorded."},409);
     await env.DB.batch([
       env.DB.prepare("UPDATE leads SET pipeline_stage='meeting_confirmed',status='proposal',updated_at=? WHERE id=? AND organisation_id=?").bind(now,appointment.lead_id,org),
-      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_client_accepted',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,response:"accepted",source:"Google Calendar RSVP"}),"Google Calendar")
+      env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_client_accepted',?,?)").bind(crypto.randomUUID(),org,appointment.lead_id,JSON.stringify({appointment_id:id,response:"accepted",source:"Google Calendar RSVP + matching Google Gmail acceptance receipt",google_receipt_message_id:receiptMessageId,google_receipt_subject:receiptSubject,google_receipt_from:receiptFrom,google_receipt_received_at:String(body.google_receipt_received_at||"")}),"Google Calendar")
     ]);
     return json({success:true,status:"confirmed",rsvp_status:"accepted"});
   }
