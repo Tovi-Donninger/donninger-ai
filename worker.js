@@ -889,6 +889,60 @@ async function handleSalesMeetingPreparation(request, env) {
   } });
 }
 
+async function handleSalesMeetingPreparationEmail(request, env) {
+  const auth = await requireAdmin(request, env);
+  if (auth.error) return auth.error;
+  if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
+  if (!env.DONNINGER_EMAIL_TOKEN) return json({ error: "Email sending is not configured. Add DONNINGER_EMAIL_TOKEN as a Worker secret." }, 503);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "Invalid email request." }, 400); }
+  const leadId = String(body.lead_id || "").trim().slice(0, 80);
+  const recipient = String(auth.session?.email || "").trim().toLowerCase();
+  if (!leadId) return json({ error: "A lead must be selected." }, 400);
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) return json({ error: "The logged-in sales leader's email address could not be verified." }, 400);
+  const org = "dev-donninger";
+  const lead = await env.DB.prepare("SELECT first_name,last_name,company FROM leads WHERE id=? AND organisation_id=? LIMIT 1").bind(leadId, org).first();
+  if (!lead) return json({ error: "Lead not found." }, 404);
+  const report = body.report && typeof body.report === "object" ? body.report : {};
+  const fields = [
+    ["Lead overview", report.lead_overview],
+    ["Qualification assessment", report.qualification_summary],
+    ["Email correspondence", report.email_correspondence]
+  ];
+  const arrays = [
+    ["Meeting objectives", report.meeting_objectives],
+    ["Discovery questions", report.discovery_questions],
+    ["Recommended agenda", report.recommended_agenda]
+  ];
+  const clean = value => String(value || "").trim().slice(0, 8000);
+  if (fields.some(([, value]) => !clean(value)) || arrays.some(([, value]) => !Array.isArray(value))) {
+    return json({ error: "The complete meeting brief is required before it can be emailed." }, 400);
+  }
+  const sections = [
+    ...fields.map(([title, value]) => title + "\n" + clean(value)),
+    ...arrays.map(([title, value]) => title + "\n" + value.slice(0, 10).map((item, index) => (index + 1) + ". " + clean(item)).join("\n"))
+  ];
+  const name = [lead.first_name, lead.last_name].filter(Boolean).join(" ");
+  const subject = "Meeting preparation brief" + (name ? " — " + name : "") + (lead.company ? " (" + lead.company + ")" : "");
+  const message = "MEETING PREPARATION BRIEF\n" + (name ? "Lead: " + name + "\n" : "") + (lead.company ? "Company: " + lead.company + "\n" : "") + "\n" + sections.join("\n\n") + "\n\nPrepared by Donninger.AI";
+  try {
+    const sent = await sendMeetingEmail(env, {
+      action: "send_sales_outreach_email",
+      email: recipient,
+      lead_name: name || "Sales leader",
+      message_id: "meeting-brief-" + crypto.randomUUID(),
+      subject,
+      body: message
+    });
+    await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'meeting_brief_emailed',?,?)")
+      .bind(crypto.randomUUID(), org, leadId, JSON.stringify({ recipient, subject, provider: "gmail" }), auth.session.email).run();
+    return json({ success: true, recipient, message: sent.message || "Meeting brief email sent." });
+  } catch (error) {
+    console.error("Meeting brief email failed:", String(error.message || error));
+    return json({ error: "The meeting brief could not be emailed. " + String(error.message || error).slice(0, 180) }, 502);
+  }
+}
+
 async function handleSalesEmailHistory(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
@@ -1261,6 +1315,7 @@ async function handleApi(request, env) {
   if (url.pathname === "/api/sales/appointments") return handleSalesAppointments(request, env);
   if (url.pathname === "/api/sales/pipeline") return handleSalesPipeline(request, env);
   if (url.pathname === "/api/sales/meeting-preparation") return handleSalesMeetingPreparation(request, env);
+  if (url.pathname === "/api/sales/meeting-preparation/email") return handleSalesMeetingPreparationEmail(request, env);
   if (url.pathname === "/api/sales/email-history") return handleSalesEmailHistory(request, env);
   if (url.pathname === "/api/sales/outreach/drafts") return handleSalesOutreachDrafts(request, env);
   if (url.pathname === "/api/sales/outreach/send") return handleSalesOutreachSend(request, env);
