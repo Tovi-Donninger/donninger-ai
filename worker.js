@@ -835,8 +835,8 @@ async function handleSalesMeetingPreparation(request, env) {
     "SELECT l.id,l.first_name,l.last_name,l.email,l.phone,l.company,l.job_title,l.source,l.customer_need,l.pipeline_stage,l.contact_permission,a.id AS appointment_id,a.status AS appointment_status,a.requested_start_at,a.prospect_timezone,a.timezone AS appointment_timezone,a.discussion_summary,a.admin_accepted_at,a.prospect_accepted_at FROM leads l LEFT JOIN sales_appointments a ON a.id=(SELECT a2.id FROM sales_appointments a2 WHERE a2.organisation_id=l.organisation_id AND a2.lead_id=l.id ORDER BY a2.created_at DESC LIMIT 1) WHERE l.id=? AND l.organisation_id=? LIMIT 1"
   ).bind(leadId, org).first();
   if (!lead) return json({ error: "Lead not found." }, 404);
-  if (lead.pipeline_stage !== "meeting_confirmed" || lead.appointment_status !== "confirmed" || !lead.admin_accepted_at || !lead.prospect_accepted_at) {
-    return json({ error: "Meeting preparation is available only after both the administrator and the prospect have confirmed the meeting." }, 409);
+  if (lead.pipeline_stage !== "meeting_confirmed" || lead.appointment_status !== "confirmed") {
+    return json({ error: "Meeting preparation is available only for leads in the confirmed-meeting pipeline stage with a confirmed appointment status." }, 409);
   }
   const qualification = await env.DB.prepare(
     "SELECT status,priority,fit_score,confidence,result_json,evidence_json,model_name,profile_version,completed_at FROM sales_qualification_runs WHERE organisation_id=? AND lead_id=? AND status='completed' ORDER BY completed_at DESC,created_at DESC LIMIT 1"
