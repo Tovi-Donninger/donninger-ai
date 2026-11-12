@@ -378,3 +378,21 @@
  background:#f6f8fb!important;opacity:1;
  box-shadow:0 1px 0 #e5ebf2;
 }
+
+
+/* Meeting preparation: anchored action at the bottom of the lead drawer. */
+.meeting-prep-footer{position:sticky;bottom:-1px;z-index:5;margin:20px -28px -42px;padding:16px 28px 20px;background:rgba(255,255,255,.97);border-top:1px solid #e6edf4;box-shadow:0 -8px 24px rgba(20,42,68,.06)}
+.meeting-prep-button{width:100%;min-height:46px;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:800}
+.meeting-prep-button:disabled{opacity:.7;cursor:wait}
+.meeting-prep-status{margin:8px 0 0;color:#647991;font-size:11px;text-align:center}
+.meeting-prep-report{margin-top:12px;padding:18px;border:1px solid #e3eaf2;border-radius:12px;background:#fbfcfe}
+.meeting-prep-report[hidden]{display:none!important}
+.meeting-prep-report section{padding:0 0 14px;margin:0 0 14px;border-bottom:1px solid #e8edf3}
+.meeting-prep-report section:last-of-type{border-bottom:0}
+.meeting-prep-report h4{margin:0 0 7px;color:#244563;font-size:12px;font-weight:800}
+.meeting-prep-report p{margin:0;color:#4f647b;font-size:12px;line-height:1.7;white-space:pre-wrap}
+.meeting-prep-generated{margin:4px 0 12px!important;color:#8997a8!important;font-size:10px!important}
+.meeting-prep-copy{width:100%}
+.meeting-prep-spinner{width:13px;height:13px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:meetingPrepSpin .7s linear infinite}
+@keyframes meetingPrepSpin{to{transform:rotate(360deg)}}
+@media(max-width:640px){.meeting-prep-footer{margin-left:-18px;margin-right:-18px;padding-left:18px;padding-right:18px}}
