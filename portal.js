@@ -60,7 +60,7 @@ async function showSalesWorkspace(){
  <section class="sales-view-section" id="sales-view-pipeline">
   <div class="sales-page-heading"><div><div class="dash-eyebrow">SALES & LEAD GENERATION / ACTIVE WORK</div><h1>Sales Pipeline<span>.</span></h1><p>Track every qualified prospect from first contact through meetings, decisions and conversion.</p></div><button class="portal-button portal-button-primary" type="button" data-sales-goto="lead-capture">＋ Add leads</button></div>
   <div class="sales-process-strip"><span>01 <b>Capture</b></span><i>→</i><span>02 <b>Qualify</b></span><i>→</i><span>03 <b>Contact</b></span><i>→</i><span>04 <b>Meet</b></span><i>→</i><span>05 <b>Close</b></span></div>
-  <section class="dash-card sales-pipeline-card"><div class="sales-leads-heading"><div><div class="dash-eyebrow">LIVE SALES JOURNEY</div><h3>Pipeline stages</h3><p>Move prospects between stages as their sales journey progresses. Customer acceptance is required before a meeting is confirmed.</p></div><button class="text-action" id="refreshSalesPipeline" type="button">Refresh ↻</button></div><p id="salesPipelineCount" class="sales-lead-count">Loading pipeline…</p><div id="salesPipelineBoard" class="sales-pipeline-board"></div></section>
+  <section class="dash-card sales-pipeline-card"><div class="sales-leads-heading"><div><div class="dash-eyebrow">LIVE SALES JOURNEY</div><h3>Pipeline stages</h3><p>Move prospects between stages as their sales journey progresses. Customer acceptance is required before a meeting is confirmed.</p></div><button class="text-action" id="refreshSalesPipeline" type="button">Refresh ↻</button></div><div id="salesPipelineSummary" class="sales-pipeline-summary"></div><div class="sales-pipeline-toolbar"><label class="sales-pipeline-search"><span>⌕</span><input id="salesPipelineSearch" type="search" placeholder="Search prospects, companies or email…" autocomplete="off"></label><label class="sales-pipeline-filter">Stage <select id="salesPipelineFilter"><option value="all">All stages</option><option value="contacted">Contacted</option><option value="meeting_requested">Meeting requested</option><option value="meeting_confirmed">Meeting confirmed</option><option value="meeting_completed">Meeting completed</option><option value="converted">Converted</option><option value="lost">Lost</option></select></label></div><p id="salesPipelineCount" class="sales-lead-count">Loading pipeline…</p><div id="salesPipelineBoard" class="sales-pipeline-board"></div></section>
   <section class="dash-card sales-appointments-card"><div class="sales-leads-heading"><div><div class="dash-eyebrow">MEETING MANAGEMENT</div><h3>Meeting requests & confirmations</h3><p>Review proposed times, approve or decline requests, and monitor customer RSVP status.</p></div><button class="text-action" id="refreshSalesAppointments" type="button">Refresh ↻</button></div><p id="salesAppointmentsCount" class="sales-lead-count">Loading meeting requests…</p><div id="salesAppointmentsBoard" class="sales-pipeline-board"></div></section>
  </section>
  <section class="sales-view-section" id="sales-view-lead-capture" hidden>
@@ -107,6 +107,8 @@ async function showSalesWorkspace(){
  });
  ["refreshSalesLeads","refreshSalesAppointments","refreshQualifiedLeads","refreshUnqualifiedLeads","refreshSalesPipeline"].forEach(id=>{const button=document.getElementById(id);if(button)button.addEventListener("click",()=>({refreshSalesLeads:loadSalesLeads,refreshSalesAppointments:loadSalesAppointments,refreshQualifiedLeads:loadQualifiedLeads,refreshUnqualifiedLeads:loadUnqualifiedLeads,refreshSalesPipeline:loadSalesPipeline}[id])());});
  host.querySelectorAll("[data-sales-goto]").forEach(button=>button.addEventListener("click",()=>showSalesView(button.dataset.salesGoto)));
+ const pipelineSearch=document.getElementById("salesPipelineSearch"),pipelineFilter=document.getElementById("salesPipelineFilter");
+ pipelineSearch?.addEventListener("input",renderSalesPipeline);pipelineFilter?.addEventListener("change",renderSalesPipeline);
  showSalesView("pipeline");
  await Promise.all([loadSalesAppointments(),loadSalesLeads(),loadQualifiedLeads(),loadUnqualifiedLeads(),loadSalesPipeline()]);
 }
@@ -120,14 +122,35 @@ async function loadSalesLeads(){
  }catch(error){count.textContent="Unable to load leads";table.innerHTML='<div class="sales-empty">'+escapeHtml(error.message)+'</div>';}
 }
 
-async function loadSalesPipeline(){
- const count=document.getElementById('salesPipelineCount'),host=document.getElementById('salesPipelineBoard');if(!host)return;count.textContent='Loading sales pipeline…';
- try{const r=await fetch('/api/sales/pipeline',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load sales pipeline.');const rows=d.pipeline_leads||[];count.textContent=rows.length+' leads currently in active sales stages';
- const stages=[['contacted','Contacted Leads'],['meeting_requested','Meeting Requested'],['meeting_confirmed','Meeting Confirmed'],['meeting_completed','Meeting Completed'],['converted','Converted'],['lost','Lost']];
- host.innerHTML=stages.map(([stage,label])=>{const items=rows.filter(v=>v.pipeline_stage===stage);const options=stages.filter(([value])=>value!==stage).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('');return '<section class="sales-pipeline-column"><header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+(items.length?items.map(v=>'<article class="sales-pipeline-lead"><strong>'+escapeHtml((v.first_name+' '+(v.last_name||'')).trim())+'</strong><small>'+escapeHtml(v.company||'')+' · '+escapeHtml(v.email||'')+'</small><p>'+escapeHtml(v.customer_need||'No customer need recorded')+'</p><label>Update stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(v.lead_id)+'"><option value="'+stage+'" selected>'+label+'</option>'+options+'</select></label><button type="button" class="sales-email-history-button" data-lead-id="'+escapeHtml(v.lead_id)+'">View email history</button><div class="sales-email-history" hidden></div></article>').join(''):'<div class="sales-empty-state">No leads in this stage.</div>')+'</section>';}).join('');
- }catch(e){count.textContent='Unable to load pipeline';host.textContent=e.message;}
+let salesPipelineRows=[];
+function renderSalesPipeline(){
+ const count=document.getElementById("salesPipelineCount"),host=document.getElementById("salesPipelineBoard");if(!host||!count)return;
+ const search=(document.getElementById("salesPipelineSearch")?.value||"").trim().toLowerCase();
+ const filter=document.getElementById("salesPipelineFilter")?.value||"all";
+ const rows=salesPipelineRows.filter(v=>{
+  const haystack=[v.first_name,v.last_name,v.company,v.email,v.customer_need].join(" ").toLowerCase();
+  return (!search||haystack.includes(search))&&(filter==="all"||v.pipeline_stage===filter);
+ });
+ const summary=document.getElementById("salesPipelineSummary");
+ if(summary){
+  const metrics=[["Active prospects",salesPipelineRows.length],["Meetings requested",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_requested").length],["Meetings confirmed",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_confirmed").length],["Converted",salesPipelineRows.filter(v=>v.pipeline_stage==="converted").length]];
+  summary.innerHTML=metrics.map(([label,value])=>'<div class="sales-pipeline-metric"><span>'+label+'</span><strong>'+value+'</strong></div>').join("");
+ }
+ count.textContent=rows.length===salesPipelineRows.length?rows.length+" prospects in the pipeline":rows.length+" of "+salesPipelineRows.length+" prospects match your filters";
+ const stages=[["contacted","Contacted Leads"],["meeting_requested","Meeting Requested"],["meeting_confirmed","Meeting Confirmed"],["meeting_completed","Meeting Completed"],["converted","Converted"],["lost","Lost"]];
+ host.innerHTML=stages.map(([stage,label])=>{
+  const items=rows.filter(v=>v.pipeline_stage===stage);
+  const options=stages.filter(([value])=>value!==stage).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join("");
+  return '<section class="sales-pipeline-column"><header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+(items.length?items.map(v=>'<article class="sales-pipeline-lead"><strong>'+escapeHtml((v.first_name+" "+(v.last_name||"")).trim())+'</strong><small>'+escapeHtml(v.company||"")+' · '+escapeHtml(v.email||"")+'</small><p>'+escapeHtml(v.customer_need||"No customer need recorded")+'</p><label>Move to stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(v.lead_id)+'"><option value="'+stage+'" selected>'+label+'</option>'+options+'</select></label><button type="button" class="sales-email-history-button" data-lead-id="'+escapeHtml(v.lead_id)+'">View email history</button><div class="sales-email-history" hidden></div></article>').join(""):'<div class="sales-empty-state">No prospects in this stage.</div>')+'</section>';
+ }).join("");
 }
-
+async function loadSalesPipeline(){
+ const count=document.getElementById("salesPipelineCount"),host=document.getElementById("salesPipelineBoard");if(!host)return;count.textContent="Loading sales pipeline…";
+ try{
+  const r=await fetch("/api/sales/pipeline",{credentials:"same-origin",cache:"no-store"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load sales pipeline.");
+  salesPipelineRows=d.pipeline_leads||[];renderSalesPipeline();
+ }catch(e){count.textContent="Unable to load pipeline";host.textContent=e.message;}
+}
 async function loadSalesAppointments(){
  const count=document.getElementById("salesAppointmentsCount");
  const host=document.getElementById("salesAppointmentsBoard");
