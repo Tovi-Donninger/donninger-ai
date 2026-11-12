@@ -198,6 +198,32 @@ async function openSalesLeadDrawer(leadId){
   (lead.appointment_status==="confirmed"?'<div class="meeting-prep-footer"><button type="button" class="portal-button portal-button-primary meeting-prep-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Prepare for meeting <span>✦</span></button></div>':"");
  document.querySelectorAll(".sales-pipeline-row").forEach(row=>row.removeAttribute("aria-current"));document.querySelector('.sales-pipeline-row[data-lead-id="'+CSS.escape(String(leadId))+'"]')?.setAttribute("aria-current","true");overlay.hidden=false;document.body.classList.add("sales-drawer-open");
  content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
+ content.querySelector(".meeting-prep-button")?.addEventListener("click",event=>{
+  event.preventDefault();event.stopPropagation();
+  prepareMeetingBrief(lead.lead_id,event.currentTarget);
+ });
+}
+async function prepareMeetingBrief(leadId,prepareButton){
+ if(!leadId||!prepareButton)return;
+ const drawerOverlay=document.getElementById("salesLeadDrawerOverlay");
+ if(!drawerOverlay)return;
+ drawerOverlay.querySelector("#meetingPrepModal")?.remove();
+ const modal=document.createElement("div");
+ modal.className="meeting-prep-modal-overlay";
+ modal.id="meetingPrepModal";
+ modal.innerHTML='<section class="meeting-prep-modal" role="dialog" aria-modal="true" aria-labelledby="meetingPrepModalTitle"><header class="meeting-prep-modal-header"><div><div class="dash-eyebrow">MEETING INTELLIGENCE</div><h2 id="meetingPrepModalTitle">Meeting preparation</h2><p>Lead background, qualification, correspondence and a tailored meeting plan.</p></div><button type="button" class="meeting-prep-modal-close" aria-label="Close meeting preparation">×</button></header><p class="meeting-prep-modal-status" id="meetingPrepModalStatus" role="status"><span class="meeting-prep-spinner" aria-hidden="true"></span> Reviewing the lead record, qualification and recorded email correspondence…</p><div id="meetingPrepReport" class="meeting-prep-report" hidden></div></section>';
+ drawerOverlay.appendChild(modal);
+ const status=modal.querySelector("#meetingPrepModalStatus"),report=modal.querySelector("#meetingPrepReport");
+ prepareButton.disabled=true;prepareButton.innerHTML='Preparing meeting brief <span class="meeting-prep-spinner" aria-hidden="true"></span>';
+ try{
+  const response=await fetch("/api/sales/meeting-preparation",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},cache:"no-store",body:JSON.stringify({lead_id:leadId})});
+  const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not prepare the meeting brief.");
+  const sections=data.report||{};
+  const blocks=[["Lead overview",sections.lead_overview],["Qualification assessment",sections.qualification_summary],["Email correspondence",sections.email_correspondence],["Meeting objectives",sections.meeting_objectives],["Suggested discovery questions",sections.discovery_questions],["Recommended agenda",sections.recommended_agenda]];
+  report.innerHTML=blocks.map(([title,value])=>'<section><h4>'+escapeHtml(title)+'</h4><p>'+escapeHtml(Array.isArray(value)?value.map((v,i)=>(i+1)+'. '+v).join("\n"):value||"Not available in the recorded information.")+'</p></section>').join("")+'<p class="meeting-prep-generated">Generated from the lead record and recorded correspondence · '+escapeHtml(new Date(data.generated_at||Date.now()).toLocaleString())+'</p><div class="meeting-prep-actions"><button type="button" class="portal-button portal-button-primary meeting-prep-email" data-lead-id="'+escapeHtml(leadId)+'">Email sales leader</button><button type="button" class="portal-button portal-button-secondary meeting-prep-download">Download PDF</button><button type="button" class="portal-button portal-button-secondary meeting-prep-copy">Copy meeting brief</button></div>';
+  report.hidden=false;status.textContent="Meeting brief ready.";
+ }catch(error){status.textContent=error.message;}
+ finally{prepareButton.disabled=false;prepareButton.innerHTML='Prepare for meeting <span>✦</span>';}
 }
 function closeSalesLeadDrawer(){
  salesDrawerRequest++;
@@ -301,31 +327,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
  const pipelineRow=e.target.closest(".sales-pipeline-row");
  if(pipelineRow){openSalesLeadDrawer(pipelineRow.dataset.leadId);return;}
  if(e.target.closest(".lead-drawer-close")){closeSalesLeadDrawer();return;}
- const prepareButton=e.target.closest(".meeting-prep-button");
- if(prepareButton){
-  const leadId=prepareButton.dataset.leadId;
-  if(!leadId)return;
-  const drawerOverlay=document.getElementById("salesLeadDrawerOverlay");
-  if(!drawerOverlay)return;
-  drawerOverlay.querySelector("#meetingPrepModal")?.remove();
-  const modal=document.createElement("div");
-  modal.className="meeting-prep-modal-overlay";
-  modal.id="meetingPrepModal";
-  modal.innerHTML='<section class="meeting-prep-modal" role="dialog" aria-modal="true" aria-labelledby="meetingPrepModalTitle"><header class="meeting-prep-modal-header"><div><div class="dash-eyebrow">MEETING INTELLIGENCE</div><h2 id="meetingPrepModalTitle">Meeting preparation</h2><p>Lead background, qualification, correspondence and a tailored meeting plan.</p></div><button type="button" class="meeting-prep-modal-close" aria-label="Close meeting preparation">×</button></header><p class="meeting-prep-modal-status" id="meetingPrepModalStatus" role="status"><span class="meeting-prep-spinner" aria-hidden="true"></span> Reviewing the lead record, qualification and recorded email correspondence…</p><div id="meetingPrepReport" class="meeting-prep-report" hidden></div></section>';
-  drawerOverlay.appendChild(modal);
-  const status=modal.querySelector("#meetingPrepModalStatus"),report=modal.querySelector("#meetingPrepReport");
-  prepareButton.disabled=true;prepareButton.innerHTML='Preparing meeting brief <span class="meeting-prep-spinner" aria-hidden="true"></span>';
-  try{
-   const response=await fetch("/api/sales/meeting-preparation",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},cache:"no-store",body:JSON.stringify({lead_id:leadId})});
-   const data=await response.json();if(!response.ok)throw new Error(data.error||"Could not prepare the meeting brief.");
-   const sections=data.report||{};
-   const blocks=[["Lead overview",sections.lead_overview],["Qualification assessment",sections.qualification_summary],["Email correspondence",sections.email_correspondence],["Meeting objectives",sections.meeting_objectives],["Suggested discovery questions",sections.discovery_questions],["Recommended agenda",sections.recommended_agenda]];
-   report.innerHTML=blocks.map(([title,value])=>'<section><h4>'+escapeHtml(title)+'</h4><p>'+escapeHtml(Array.isArray(value)?value.map((v,i)=>(i+1)+'. '+v).join("\n"):value||"Not available in the recorded information.")+'</p></section>').join("")+'<p class="meeting-prep-generated">Generated from the lead record and recorded correspondence · '+escapeHtml(new Date(data.generated_at||Date.now()).toLocaleString())+'</p><div class="meeting-prep-actions"><button type="button" class="portal-button portal-button-primary meeting-prep-email" data-lead-id="'+escapeHtml(leadId)+'">Email sales leader</button><button type="button" class="portal-button portal-button-secondary meeting-prep-download">Download PDF</button><button type="button" class="portal-button portal-button-secondary meeting-prep-copy">Copy meeting brief</button></div>';
-   report.hidden=false;status.textContent="Meeting brief ready.";
-  }catch(error){status.textContent=error.message;}
-  finally{prepareButton.disabled=false;prepareButton.innerHTML='Prepare for meeting <span>✦</span>';}
-  return;
- }
+ if(e.target.closest(".meeting-prep-button"))return;
  if(e.target.closest(".meeting-prep-modal-close")||e.target.id==="meetingPrepModal"){
   e.target.closest("#meetingPrepModal")?.remove();
   return;
