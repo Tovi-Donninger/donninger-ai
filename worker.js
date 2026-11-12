@@ -852,7 +852,7 @@ async function handleSalesEmailHistory(request, env) {
     activities: activities.results || []
   });
 }
-async function parseSalesEmailDraftOutput(value) {
+function parseSalesEmailDraftOutput(value) {
   let source = String(value || "").trim();
   source = source.replace(/^\x60{3}(?:json)?\s*/i, "").replace(/\s*\x60{3}$/i, "").trim();
   const first = source.indexOf("{"), last = source.lastIndexOf("}");
@@ -874,7 +874,7 @@ async function parseSalesEmailDraftOutput(value) {
   return JSON.parse(repaired);
 }
 
-function handleSalesOutreachDrafts(request, env) {
+async function handleSalesOutreachDrafts(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth.error) return auth.error;
   if (request.method !== "POST") return json({ error: "Method not allowed." }, 405, { allow: "POST" });
