@@ -181,13 +181,13 @@ async function openSalesLeadDrawer(leadId){
  const name=(lead.first_name+" "+(lead.last_name||"")).trim()||"Unnamed lead";
  const stageOptions=[["contacted","Contacted"],["meeting_requested","Meeting requested"],["meeting_confirmed","Meeting confirmed"],["meeting_completed","Meeting completed"],["converted","Converted"],["lost","Lost"]];
  content.innerHTML=(detailWarning?'<p class="lead-drawer-warning">Some additional record fields could not be loaded: '+escapeHtml(detailWarning)+'</p>':'')+'<div class="lead-drawer-header"><div><div class="dash-eyebrow">LEAD RECORD</div><h2>'+escapeHtml(name)+'</h2><p>'+escapeHtml(lead.company||"Company not specified")+'</p></div><button type="button" class="lead-drawer-close" aria-label="Close lead details">×</button></div>'+
-  '<div class="lead-drawer-actions"><a class="lead-drawer-action" href="'+(lead.email?'mailto:'+encodeURIComponent(lead.email):'#')+'" '+(!lead.email?'aria-disabled="true"':'')+'>Email lead ↗</a><a class="lead-drawer-action" href="'+(lead.phone?'tel:'+encodeURIComponent(lead.phone):'#')+'" '+(!lead.phone?'aria-disabled="true"':'')+'>Call lead ↗</a><button type="button" class="lead-drawer-action edit-lead-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Edit details</button></div>'+
+  '<div class="lead-drawer-actions"><a class="lead-drawer-action lead-drawer-contact-action" href="'+(lead.email?'mailto:'+encodeURIComponent(lead.email):'#')+'" '+(!lead.email?'aria-disabled="true"':'')+'>✉ <span>Email lead</span></a><a class="lead-drawer-action lead-drawer-contact-action" href="'+(lead.phone?'tel:'+encodeURIComponent(lead.phone):'#')+'" '+(!lead.phone?'aria-disabled="true"':'')+'>↗ <span>Call lead</span></a><button type="button" class="lead-drawer-action lead-drawer-edit-action edit-lead-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">✎ <span>Edit details</span></button><button type="button" class="lead-drawer-action lead-drawer-history-jump" data-lead-id="'+escapeHtml(lead.lead_id)+'">↓ <span>View email conversation</span></button></div>'+
   '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Contact information</h3><span class="lead-status-pill">'+escapeHtml(salesStageLabel(lead.pipeline_stage))+'</span></div><div class="lead-drawer-info-grid">'+
   [['Email',lead.email],['Phone',lead.phone],['Job title',lead.job_title],['Company',lead.company],['Contact permission',(lead.contact_permission||"unknown").replaceAll("_"," ")],['Lead ID',lead.lead_id]].map(([label,value])=>'<div><small>'+label+'</small><strong>'+escapeHtml(value||"Not provided")+'</strong></div>').join("")+'</div>'+
   (lead.customer_need?'<div class="lead-drawer-need"><small>Customer need / reason for enquiry</small><p>'+escapeHtml(lead.customer_need)+'</p></div>':"")+
   '<label class="lead-drawer-stage">Pipeline stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(lead.lead_id)+'">'+stageOptions.map(([value,label])=>'<option value="'+value+'" '+(lead.pipeline_stage===value?"selected":"")+'>'+label+'</option>').join("")+'</select></label></section>'+
   '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Appointments</h3></div>'+salesAppointmentMarkup(lead)+'</section>'+
-  '<section class="lead-drawer-section lead-drawer-email-section"><div class="lead-drawer-section-heading"><div><h3>Email history</h3><p>Recorded incoming and outgoing messages for this lead.</p></div><button type="button" class="text-action sales-email-history-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Load email history ↻</button></div><div class="sales-email-history lead-drawer-email-history" hidden></div></section>'+
+  '<section class="lead-drawer-section lead-drawer-email-section" id="leadEmailConversation"><div class="lead-drawer-section-heading"><div><div class="dash-eyebrow">CONVERSATION TIMELINE</div><h3>Email conversation</h3><p>Full incoming and outgoing email messages, in chronological order.</p></div><button type="button" class="portal-button portal-button-secondary sales-email-history-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Load conversation ↓</button></div><div class="sales-email-history lead-drawer-email-history" hidden></div></section>'+
   '<section class="lead-drawer-section"><h3>Sales notes</h3><p class="lead-drawer-muted">The original enquiry and recorded email analysis are shown above. Use the lead database to update the contact record.</p></section>';
  document.querySelectorAll(".sales-pipeline-row").forEach(row=>row.removeAttribute("aria-current"));document.querySelector('.sales-pipeline-row[data-lead-id="'+CSS.escape(String(leadId))+'"]')?.setAttribute("aria-current","true");overlay.hidden=false;document.body.classList.add("sales-drawer-open");
  content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
@@ -379,42 +379,34 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
   }
   return;
  }
- const historyButton=e.target.closest(".sales-email-history-button");
- if(historyButton){
-  const panel=historyButton.nextElementSibling;
-  const leadId=historyButton.dataset.leadId;
-  if(panel.hidden){
-   panel.hidden=false;
-   panel.innerHTML="Loading email history…";
-   historyButton.disabled=true;
-   try{
-    const response=await fetch("/api/sales/email-history?lead_id="+encodeURIComponent(leadId),{credentials:"same-origin",cache:"no-store"});
-    const data=await response.json();
-    if(!response.ok)throw new Error(data.error||"Could not load email history.");
-    const messages=data.messages||[];
-    const activities=(data.activities||[]).filter(a=>a.activity_type==="sales_email_reply_received");
-    const analyses=new Map();
-    activities.forEach(a=>{
-     try{
-      const details=JSON.parse(a.details_json||"{}");
-      analyses.set(details.gmail_message_id,details);
-     }catch{}
-    });
-    panel.innerHTML=messages.length?messages.map(m=>{
-     const analysis=analyses.get(m.gmail_message_id)||{};
-     return '<div class="sales-email-entry"><strong>'+escapeHtml(m.direction==="inbound"?"Incoming email":"Outgoing email")+'</strong><small>'+escapeHtml(m.received_at||m.created_at||"")+'</small><p><strong>From:</strong> '+escapeHtml(m.sender_email||(m.direction==="outbound"?"Donninger.AI":""))+'</p><p><strong>To:</strong> '+escapeHtml(m.recipient_email||"")+'</p><p><strong>Subject:</strong> '+escapeHtml(m.subject||"(No subject)")+'</p><p>'+escapeHtml(m.body_text||"")+'</p>'+(analysis.summary?'<p><strong>AI summary:</strong> '+escapeHtml(analysis.summary)+'</p>':"")+(analysis.key_points?.length?'<p><strong>Key points:</strong> '+escapeHtml(analysis.key_points.join(" · "))+'</p>':"")+(analysis.suggested_reply?'<p><strong>Suggested reply (draft only):</strong><br>'+escapeHtml(analysis.suggested_reply)+'</p>':"")+'</div>';
-    }).join(""):'<p>No emails recorded for this lead yet.</p>';
-   }catch(error){
-    panel.textContent=error.message;
-   }finally{
-    historyButton.disabled=false;
-   }
-  }else{
-   panel.hidden=true;
+ const historyJump=e.target.closest(".lead-drawer-history-jump");
+  if(historyJump){
+   const section=document.getElementById("leadEmailConversation"),historyButton=section?.querySelector(".sales-email-history-button");
+   section?.scrollIntoView({behavior:"smooth",block:"start"});
+   if(historyButton&&!historyButton.dataset.loaded&&!historyButton.disabled)historyButton.click();
+   return;
   }
-  return;
- }
- if(e.target.closest("#selectAllQualifiedLeads")){
+  const historyButton=e.target.closest(".sales-email-history-button");
+  if(historyButton){
+   const panel=historyButton.nextElementSibling,leadId=historyButton.dataset.leadId;
+   if(historyButton.dataset.loaded==="true"){panel.hidden=!panel.hidden;historyButton.textContent=panel.hidden?"Show conversation ↓":"Hide conversation ↑";return;}
+   panel.hidden=false;panel.innerHTML='<div class="lead-email-loading"><span></span>Loading the complete email conversation…</div>';historyButton.disabled=true;
+   try{
+    const response=await fetch("/api/sales/email-history?lead_id="+encodeURIComponent(leadId),{credentials:"same-origin",cache:"no-store"}),data=await response.json();
+    if(!response.ok)throw new Error(data.error||"Could not load email history.");
+    const messages=[...(data.messages||[])].sort((a,b)=>new Date(a.received_at||a.created_at||0)-new Date(b.received_at||b.created_at||0));
+    const activities=(data.activities||[]).filter(a=>a.activity_type==="sales_email_reply_received"),analyses=new Map();
+    activities.forEach(a=>{try{const details=JSON.parse(a.details_json||"{}");analyses.set(details.gmail_message_id,details);}catch{}});
+    panel.innerHTML=messages.length?'<div class="lead-email-count">'+messages.length+' message'+(messages.length===1?'':'s')+' · oldest to newest</div>'+messages.map(m=>{
+     const inbound=m.direction==="inbound",analysis=analyses.get(m.gmail_message_id)||{},stamp=m.received_at||m.created_at||"Date not recorded";
+     return '<article class="sales-email-entry '+(inbound?'is-inbound':'is-outbound')+'"><div class="sales-email-entry-top"><span class="sales-email-direction">'+(inbound?'↓ Incoming':'↑ Sent by Donninger.AI')+'</span><time>'+escapeHtml(stamp)+'</time></div><h4>'+escapeHtml(m.subject||"(No subject)")+'</h4><div class="sales-email-addresses"><p><strong>From</strong><span>'+escapeHtml(m.sender_email||(inbound?'Lead':'Donninger.AI'))+'</span></p><p><strong>To</strong><span>'+escapeHtml(m.recipient_email||"Not recorded")+'</span></p></div><div class="sales-email-body">'+escapeHtml(m.body_text||m.snippet||"No readable email body was stored.")+'</div>'+(analysis.summary?'<details class="sales-email-analysis"><summary>AI email notes</summary><p><strong>Summary:</strong> '+escapeHtml(analysis.summary)+'</p>'+(analysis.key_points?.length?'<p><strong>Key points:</strong> '+escapeHtml(analysis.key_points.join(" · "))+'</p>':'')+(analysis.suggested_reply?'<p><strong>Suggested reply (draft only):</strong><br>'+escapeHtml(analysis.suggested_reply)+'</p>':'')+'</details>':'')+'</article>';
+    }).join(""):'<div class="lead-drawer-empty">No email messages have been recorded for this lead yet.</div>';
+    historyButton.dataset.loaded="true";historyButton.textContent="Hide conversation ↑";
+   }catch(error){panel.innerHTML='<div class="lead-drawer-warning">'+escapeHtml(error.message)+'</div>';}
+   finally{historyButton.disabled=false;}
+   return;
+  }
+  if(e.target.closest("#selectAllQualifiedLeads")){
   const master=document.getElementById("selectAllQualifiedLeads"),checks=[...document.querySelectorAll(".qualified-lead-select")];checks.forEach(box=>box.checked=master.checked);
   const selected=checks.filter(box=>box.checked).length,button=document.getElementById("contactQualifiedLeads");if(button){button.disabled=selected===0;button.textContent="Contact Selected Leads ("+selected+") ✉";}
  }
