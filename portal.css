@@ -412,3 +412,10 @@
 .meeting-prep-modal .meeting-prep-report p{font-size:12px;line-height:1.75}
 .meeting-prep-modal .meeting-prep-copy{max-width:220px}
 @media(max-width:640px){.meeting-prep-modal-overlay{padding:10px}.meeting-prep-modal{width:100%;max-height:92vh;padding:20px 18px;border-radius:13px}.meeting-prep-modal-header h2{font-size:21px}}
+
+
+/* Meeting brief sharing and export controls */
+.meeting-prep-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid #e8edf3}
+.meeting-prep-actions .portal-button{min-height:38px}
+.meeting-prep-email{min-width:170px}
+@media(max-width:520px){.meeting-prep-actions{flex-direction:column}.meeting-prep-actions .portal-button{width:100%}}
