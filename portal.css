@@ -144,3 +144,23 @@
  .sales-process-strip b{font-size:9px}
  .sales-view-section .sales-pipeline-board,.sales-view-section .sales-appointments-card .sales-pipeline-board{grid-template-columns:repeat(6,minmax(245px,1fr))}
 }
+
+/* Searchable pipeline controls and at-a-glance sales metrics */
+.sales-pipeline-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 16px}
+.sales-pipeline-metric{padding:14px 16px;border:1px solid #e2eaf2;border-radius:9px;background:#fff}
+.sales-pipeline-metric span{display:block;color:#8493a5;font-size:8px;font-weight:800;letter-spacing:.8px;text-transform:uppercase}
+.sales-pipeline-metric strong{display:block;margin-top:5px;color:#1d3c60;font:800 24px var(--display)}
+.sales-pipeline-toolbar{display:flex;align-items:center;gap:12px;margin:15px 0 8px}
+.sales-pipeline-search{display:flex;align-items:center;gap:9px;flex:1;min-width:180px;padding:0 12px;border:1px solid #dce5ef;border-radius:8px;background:#fff;color:#8494a8}
+.sales-pipeline-search>span{font-size:17px}
+.sales-pipeline-search input{width:100%;min-width:0;padding:11px 0;border:0;outline:0;background:transparent;color:#263d58;font:11px var(--font)}
+.sales-pipeline-filter{display:flex;align-items:center;gap:8px;color:#657990;font-size:10px;font-weight:700}
+.sales-pipeline-filter select{min-width:155px;padding:10px 12px;border:1px solid #dce5ef;border-radius:8px;background:#fff;color:#263d58;font:11px var(--font)}
+.sales-pipeline-card .sales-lead-count{margin:7px 0 12px}
+.sales-pipeline-column>header strong{font-size:11px}
+.sales-pipeline-lead .sales-email-history-button{justify-self:start;padding:0;border:0;background:transparent;color:#3478f6;font-size:10px;font-weight:700}
+.sales-pipeline-lead .sales-email-history{padding:10px;border-radius:7px;background:#f5f8fc;color:#657990;font-size:10px;line-height:1.6;overflow-wrap:anywhere}
+.sales-pipeline-lead .sales-email-history p{font-size:10px;overflow-wrap:anywhere}
+.sales-appointments-card{margin-top:18px}
+@media(max-width:850px){.sales-pipeline-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.sales-pipeline-toolbar{align-items:stretch;flex-direction:column}.sales-pipeline-filter{justify-content:space-between}.sales-pipeline-filter select{flex:1;min-width:0}.sales-pipeline-summary{gap:7px}.sales-pipeline-metric{padding:11px}.sales-pipeline-metric strong{font-size:21px}}
