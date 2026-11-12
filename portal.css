@@ -360,3 +360,13 @@
  .sales-lead-drawer .lead-action-icon{flex-basis:25px;width:25px;height:25px}
 }
 @media(max-width:360px){.sales-lead-drawer .lead-drawer-actions{grid-template-columns:1fr}}
+
+
+/* New Leads bulk selection and qualification controls */
+.new-leads-toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 14px;padding:12px 14px;border:1px solid #e4ebf3;border-radius:10px;background:#f8fafd}
+.new-leads-select-all{display:inline-flex;align-items:center;gap:9px;color:#405873;font-size:12px;font-weight:700;cursor:pointer}
+.new-leads-select-all input,.sales-lead-table .new-lead-select{width:16px;height:16px;accent-color:#3478f6;cursor:pointer}
+#qualifySelectedLeads{min-height:40px;padding:9px 15px;font-size:11px}
+#qualifySelectedLeads:disabled{opacity:.48;cursor:not-allowed;box-shadow:none}
+.sales-lead-table td:first-child,.sales-lead-table th:first-child{width:42px;text-align:center}
+@media(max-width:700px){.new-leads-toolbar{align-items:stretch;flex-direction:column}.new-leads-toolbar #qualifySelectedLeads{width:100%}}
