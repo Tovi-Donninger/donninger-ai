@@ -370,3 +370,11 @@
 #qualifySelectedLeads:disabled{opacity:.48;cursor:not-allowed;box-shadow:none}
 .sales-lead-table td:first-child,.sales-lead-table th:first-child{width:42px;text-align:center}
 @media(max-width:700px){.new-leads-toolbar{align-items:stretch;flex-direction:column}.new-leads-toolbar #qualifySelectedLeads{width:100%}}
+
+/* Sales Pipeline table header: keep it anchored to the table viewport, not offset by the generic leads-table header rule. */
+.sales-table-wrap.sales-pipeline-table-wrap .sales-pipeline-table thead{position:relative;z-index:8}
+.sales-table-wrap.sales-pipeline-table-wrap .sales-pipeline-table thead th{
+ position:sticky!important;top:0!important;z-index:9!important;
+ background:#f6f8fb!important;opacity:1;
+ box-shadow:0 1px 0 #e5ebf2;
+}
