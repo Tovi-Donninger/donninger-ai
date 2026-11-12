@@ -263,7 +263,7 @@ async function loadQualificationProfile(){
  try{const r=await fetch("/api/sales/qualification-profile",{credentials:"same-origin"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load profile.");Object.entries(d.profile?.criteria||{}).forEach(([k,v])=>{const f=form.elements.namedItem(k);if(f)f.value=v||"";});status.textContent=d.profile?"Profile version "+d.profile.version+" loaded.":"No profile saved yet.";}catch(e){status.textContent=e.message;}
  const select=document.getElementById("qualificationLeadSelect");if(select){const r=await fetch("/api/sales/leads",{credentials:"same-origin"}),d=await r.json();if(r.ok)select.innerHTML='<option value="">Select a prospect…</option>'+(d.leads||[]).map(l=>'<option value="'+escapeHtml(l.id)+'">'+escapeHtml((l.first_name+" "+(l.last_name||"")).trim())+(l.company?" · "+escapeHtml(l.company):"")+'</option>').join("");}
 }
-document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSalesLeadDrawer();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSalesLeadDrawer();if((e.key==="Enter"||e.key===" ")&&e.target.matches(".sales-pipeline-row")){e.preventDefault();openSalesLeadDrawer(e.target.dataset.leadId);}});
 document.getElementById("functionDetailContent").addEventListener("change",async e=>{
  const select=e.target.closest(".pipeline-stage-select");if(!select)return;const leadId=select.dataset.leadId,stage=select.value;select.disabled=true;
  try{const r=await fetch("/api/sales/pipeline",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_id:leadId,stage})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not update pipeline stage.");await loadSalesPipeline();await loadQualifiedLeads();await loadUnqualifiedLeads();}
@@ -343,7 +343,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    if(!option)throw new Error("The selected option could not be verified. Refresh and try again.");
    const response=await fetch("/api/sales/appointments/select-time",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({appointment_id:appointmentId,start_iso:option.start_iso,timezone:option.timezone})});
    const result=await response.json();if(!response.ok)throw new Error(result.error||"Could not check availability.");
-   if(status)status.textContent=result.message||"Availability checked.";await loadSalesPipeline();await loadSalesAppointments();
+   if(status)status.textContent=result.message||"Availability checked.";await loadSalesPipeline();await loadSalesAppointments();const active=document.querySelector(".sales-pipeline-row[aria-current=\"true\"]");if(active)openSalesLeadDrawer(active.dataset.leadId);
   }catch(error){if(status)status.textContent=error.message;checkTimeButton.disabled=false;}
   return;
  }
