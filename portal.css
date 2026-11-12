@@ -272,3 +272,55 @@
 .sales-pipeline-table button.sales-row-open:focus-visible{outline:2px solid #9fc2f3;outline-offset:3px;border-radius:3px}
 .sales-pipeline-table button.sales-row-open:active{background:transparent;box-shadow:none}
 .sales-pipeline-table button.sales-row-open span{font-size:12px;line-height:1}
+
+/* Lead drawer refresh — aligned with the Donninger.AI workspace */
+.sales-lead-drawer{width:min(720px,97vw);padding:0 30px 48px;background:#f7f9fc;border-left:1px solid #e2eaf2}
+.sales-lead-drawer #salesLeadDrawerContent{max-width:100%;padding-top:22px}
+.lead-drawer-header{position:relative;align-items:center;margin:0 -30px;padding:24px 30px 22px;background:#fff;border-bottom:1px solid #e6edf4}
+.lead-drawer-header .dash-eyebrow{font-size:9px;letter-spacing:1.5px}
+.lead-drawer-header h2{font-size:28px;letter-spacing:-1px;margin:7px 0 4px}
+.lead-drawer-header p{font-size:12px;color:#8291a4}
+.lead-drawer-close{flex:0 0 38px;border:1px solid #e2eaf2;background:#f7f9fc;transition:.18s}
+.lead-drawer-close:hover{background:#eaf2fc;color:#245c9b}
+.lead-drawer-actions{position:sticky;top:0;z-index:3;margin:0 -30px;padding:13px 30px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-bottom:1px solid #e7edf4;box-shadow:0 5px 16px rgba(24,49,78,.035)}
+.lead-drawer-action{min-height:38px;padding:9px 13px;border:1px solid #dce6f0;border-radius:8px;background:#fff;color:#315879;font:700 10px var(--font);gap:7px;transition:background .16s,border-color .16s,transform .16s}
+.lead-drawer-action:hover{background:#f0f6ff;border-color:#b9d2f1;transform:translateY(-1px)}
+.lead-drawer-edit-action{background:#142c49;color:#fff;border-color:#142c49}
+.lead-drawer-edit-action:hover{background:#234b75;border-color:#234b75;color:#fff}
+.lead-drawer-history-jump{margin-left:auto;background:#edf5ff;border-color:#d7e7fb;color:#2864a6}
+.lead-drawer-section{margin:14px 0 0;padding:19px 20px;border:1px solid #e5ebf2;border-radius:11px;background:#fff;box-shadow:0 3px 12px rgba(24,49,78,.025)}
+.lead-drawer-section-heading{margin-bottom:15px}
+.lead-drawer-section h3{font:800 14px var(--display);letter-spacing:-.2px;color:#1d3553}
+.lead-drawer-section-heading p{font-size:10px;color:#8291a4;line-height:1.6}
+.lead-drawer-info-grid{gap:9px}
+.lead-drawer-info-grid>div{padding:12px 13px;border-color:#e9eef4;background:#f9fbfd}
+.lead-drawer-info-grid small,.lead-drawer-need small{font-size:8px;letter-spacing:.8px}
+.lead-drawer-info-grid strong{font-size:11px;color:#263f5d}
+.lead-drawer-need{background:#f1f6fc;border:1px solid #e4edf7}
+.lead-drawer-stage{grid-template-columns:120px 1fr;font-size:10px}
+.lead-drawer-stage select{font-size:11px}
+.lead-drawer-appointment{background:#f9fbfd;border-color:#e4ebf3}
+.lead-drawer-email-section{scroll-margin-top:18px}
+.lead-drawer-email-section .sales-email-history-button{margin:0;padding:9px 13px;min-height:36px;font-size:10px}
+.lead-drawer-email-history{max-height:none;overflow:visible;gap:13px}
+.lead-email-count{padding:9px 12px;border-radius:7px;background:#f0f6ff;color:#4c6c91;font-size:9px;font-weight:800}
+.lead-email-loading{display:flex;align-items:center;gap:10px;padding:17px;color:#647b95;font-size:10px}
+.lead-email-loading span{width:15px;height:15px;border:2px solid #dbe7f4;border-top-color:#3478f6;border-radius:50%;animation:qualificationSpin .7s linear infinite}
+.lead-drawer-email-history .sales-email-entry{padding:16px 17px;border:1px solid #e3eaf2;border-left:3px solid #3478f6;border-radius:10px;background:#fbfdff;box-shadow:0 3px 10px rgba(24,49,78,.035)}
+.lead-drawer-email-history .sales-email-entry.is-inbound{border-left-color:#25a58f;background:#fbfefd}
+.sales-email-entry-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:10px}
+.sales-email-direction{display:inline-flex;padding:5px 8px;border-radius:5px;background:#eaf2ff;color:#3266a5;font-size:8px;font-weight:800;letter-spacing:.5px;text-transform:uppercase}
+.is-inbound .sales-email-direction{background:#e8f7f2;color:#247d68}
+.sales-email-entry-top time{color:#8997a8;font-size:9px;text-align:right}
+.lead-drawer-email-history .sales-email-entry h4{margin:0 0 10px;color:#203b5a;font:800 12px var(--display);overflow-wrap:anywhere}
+.sales-email-addresses{display:grid;gap:5px;padding:10px 11px;border-radius:7px;background:#f3f6fa}
+.sales-email-addresses p{display:grid;grid-template-columns:38px minmax(0,1fr);gap:8px;margin:0!important;font-size:9px!important}
+.sales-email-addresses strong{color:#7b8ba0}
+.sales-email-addresses span{color:#435c77;overflow-wrap:anywhere}
+.lead-drawer-email-history .sales-email-entry .sales-email-body{margin-top:13px;padding-top:12px;border-top:1px solid #e9eef4;color:#465e78;font-size:11px;line-height:1.75;overflow-wrap:anywhere;white-space:pre-wrap}
+.lead-drawer-email-history .sales-email-entry p{float:none;margin:8px 0 0;color:#536a82;font-size:10px;line-height:1.6;white-space:pre-wrap}
+.sales-email-analysis{margin-top:12px;padding-top:10px;border-top:1px solid #e9eef4;color:#61758c;font-size:9px}
+.sales-email-analysis summary{cursor:pointer;color:#3478f6;font-weight:800}
+.sales-email-analysis p{margin-top:8px!important}
+.lead-drawer-loading{padding:25px;color:#71839a;font-size:11px}
+@media(max-width:700px){.sales-lead-drawer{width:100%;padding:0 16px 32px}.lead-drawer-header{margin:0 -16px;padding:20px 16px}.lead-drawer-actions{margin:0 -16px;padding:11px 16px;gap:7px}.lead-drawer-action{padding:8px 10px}.lead-drawer-history-jump{margin-left:0}.lead-drawer-section{padding:16px 14px}.lead-drawer-info-grid,.lead-drawer-appointment dl{grid-template-columns:1fr}.lead-drawer-section-heading{align-items:flex-start;flex-wrap:wrap}.lead-drawer-stage{grid-template-columns:1fr}}
