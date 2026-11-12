@@ -52,6 +52,7 @@ fetch("/api/auth/session",{credentials:"same-origin"}).then(r=>r.ok?r.json():{au
 
 function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 async function showSalesWorkspace(){
+ showView("detail");
  const host=document.getElementById("functionDetailContent");
  const globalNav=document.getElementById("globalSidebarNav"),salesNav=document.getElementById("salesSidebarNav");
  if(globalNav)globalNav.hidden=true;if(salesNav)salesNav.hidden=false;
