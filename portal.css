@@ -324,3 +324,39 @@
 .sales-email-analysis p{margin-top:8px!important}
 .lead-drawer-loading{padding:25px;color:#71839a;font-size:11px}
 @media(max-width:700px){.sales-lead-drawer{width:100%;padding:0 16px 32px}.lead-drawer-header{margin:0 -16px;padding:20px 16px}.lead-drawer-actions{margin:0 -16px;padding:11px 16px;gap:7px}.lead-drawer-action{padding:8px 10px}.lead-drawer-history-jump{margin-left:0}.lead-drawer-section{padding:16px 14px}.lead-drawer-info-grid,.lead-drawer-appointment dl{grid-template-columns:1fr}.lead-drawer-section-heading{align-items:flex-start;flex-wrap:wrap}.lead-drawer-stage{grid-template-columns:1fr}}
+
+
+/* Lead action controls — compact, aligned 2×2 action grid */
+.sales-lead-drawer .lead-drawer-actions{
+ display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;
+ position:relative;top:auto;margin:0 -30px;padding:14px 30px;
+ background:#fff;border-bottom:1px solid #e7edf4;box-shadow:0 4px 12px rgba(24,49,78,.035);
+}
+.sales-lead-drawer .lead-drawer-action{
+ box-sizing:border-box;display:flex;flex-direction:row;align-items:center;justify-content:flex-start;
+ gap:11px;width:100%;min-width:0;min-height:48px;padding:9px 13px;
+ border:1px solid #e1e8f0;border-radius:9px;background:#fff;color:#294663;
+ font:700 11px var(--font);line-height:1.25;text-align:left;text-decoration:none;
+ white-space:normal;box-shadow:0 1px 2px rgba(19,42,68,.035);
+ transition:background .16s,border-color .16s,box-shadow .16s,transform .16s;
+}
+.sales-lead-drawer .lead-drawer-action:hover{
+ background:#f5f8fc;border-color:#c7d7e8;box-shadow:0 4px 10px rgba(25,54,85,.08);transform:translateY(-1px)
+}
+.sales-lead-drawer .lead-action-icon{
+ display:inline-flex;flex:0 0 27px;width:27px;height:27px;align-items:center;justify-content:center;
+ border-radius:7px;background:#eef3f8;color:#47627e;font-size:14px;line-height:1
+}
+.sales-lead-drawer .lead-action-label{display:block;min-width:0;overflow-wrap:anywhere}
+.sales-lead-drawer .lead-drawer-edit-action{background:#173452;color:#fff;border-color:#173452}
+.sales-lead-drawer .lead-drawer-edit-action .lead-action-icon{background:rgba(255,255,255,.13);color:#fff}
+.sales-lead-drawer .lead-drawer-edit-action:hover{background:#244b70;border-color:#244b70;color:#fff}
+.sales-lead-drawer .lead-drawer-history-jump{margin:0;background:#edf5ff;color:#285d98;border-color:#d9e8f8}
+.sales-lead-drawer .lead-drawer-history-jump .lead-action-icon{background:#dcecff;color:#2864a6}
+.sales-lead-drawer .lead-drawer-contact-action[aria-disabled="true"]{opacity:.42;pointer-events:none}
+@media(max-width:700px){
+ .sales-lead-drawer .lead-drawer-actions{margin:0 -16px;padding:12px 16px;gap:7px}
+ .sales-lead-drawer .lead-drawer-action{min-height:45px;padding:8px 10px;gap:8px;font-size:10px}
+ .sales-lead-drawer .lead-action-icon{flex-basis:25px;width:25px;height:25px}
+}
+@media(max-width:360px){.sales-lead-drawer .lead-drawer-actions{grid-template-columns:1fr}}
