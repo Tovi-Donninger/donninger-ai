@@ -860,7 +860,7 @@ async function handleSalesMeetingPreparation(request, env) {
     meeting_objectives: { type: "ARRAY", items: { type: "STRING" } }, discovery_questions: { type: "ARRAY", items: { type: "STRING" } }, recommended_agenda: { type: "ARRAY", items: { type: "STRING" } }
   }, required: ["lead_overview","qualification_summary","email_correspondence","meeting_objectives","discovery_questions","recommended_agenda"] };
   const configured = String(env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
-  const models = [...new Set([configured, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash"]])];
+  const models = [...new Set([configured, "gemini-3.5-flash-lite", "gemini-3.8-flash", "gemini-3.5-flash"])];
   let lastError = null, result = null, usedModel = configured;
   for (const model of models) {
     try {
