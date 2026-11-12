@@ -616,7 +616,7 @@ async function handleCalendarRsvp(request,env){
   const receiptSubject=String(body.google_receipt_subject||"").trim();
   const receiptFrom=String(body.google_receipt_from||"").trim();
   if(!id||!email||!["accepted","declined","tentative","invited"].includes(rsvp))return json({error:"A valid appointment, guest email and RSVP status are required."},400);
-  if(rsvp==="accepted"&&(!receiptVerified||!receiptMessageId||!/^Accepted\\s*:/i.test(receiptSubject)||!receiptFrom))return json({error:"The Google Calendar acceptance receipt could not be verified. The meeting has not been moved to confirmed."},400);
+  if(rsvp==="accepted"&&(!receiptVerified||!receiptMessageId||!/^Accepted\s*:/i.test(receiptSubject)||!receiptFrom))return json({error:"The Google Calendar acceptance receipt could not be verified. The meeting has not been moved to confirmed."},400);
   const org="dev-donninger";
   const appointment=await env.DB.prepare("SELECT a.id,a.lead_id,a.status,a.admin_accepted_at,l.email FROM sales_appointments a JOIN leads l ON l.id=a.lead_id WHERE a.id=? AND a.organisation_id=?").bind(id,org).first();
   if(!appointment||String(appointment.email||"").toLowerCase()!==email)return json({error:"The appointment or guest email could not be verified."},404);
