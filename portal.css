@@ -217,7 +217,7 @@
 .sales-pipeline-table td:first-child strong{color:#1e3552;font-size:12px}
 .sales-pipeline-table td:first-child small{margin-top:4px;color:#8a98aa;font-size:9px}
 .sales-appointment-status{display:inline-flex;padding:5px 8px;border-radius:20px;background:#f1f5fa;color:#526b85;font-size:9px;font-weight:700;white-space:nowrap}
-.sales-row-open{color:#2877c7;font-size:10px;font-weight:800;white-space:nowrap}
+.sales-row-open{color:#2d5e8d;font-size:10px;font-weight:700;white-space:nowrap}
 .sales-lead-drawer-overlay{position:fixed;inset:0;z-index:100010;display:flex;justify-content:flex-end;background:rgba(12,27,45,.32);backdrop-filter:blur(2px)}
 .sales-lead-drawer-overlay[hidden]{display:none!important}
 .sales-lead-drawer{width:min(650px,96vw);height:100%;overflow:auto;background:#fff;box-shadow:-18px 0 60px rgba(18,39,66,.18);padding:26px 28px 42px;box-sizing:border-box}
@@ -266,9 +266,9 @@
 @media(max-width:700px){.sales-pipeline-table-wrap{max-height:calc(100vh - 390px)}.sales-lead-drawer{width:100%;padding:20px 17px 34px}.lead-drawer-info-grid,.lead-drawer-appointment dl{grid-template-columns:1fr}.lead-drawer-section-heading{align-items:flex-start}.lead-drawer-stage{grid-template-columns:1fr}}
 
 
-/* Clear, high-visibility action button in the sales pipeline */
-.sales-pipeline-table .sales-row-open{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-width:112px;padding:9px 14px;margin:0;border:1px solid #245fc4;border-radius:7px;background:#3478f6;color:#fff;font:700 11px var(--font);letter-spacing:.1px;white-space:nowrap;cursor:pointer;box-shadow:0 2px 5px rgba(35,91,170,.18);transition:background .15s ease,box-shadow .15s ease,transform .15s ease}
-.sales-pipeline-table .sales-row-open:hover{background:#245fc4;box-shadow:0 4px 10px rgba(35,91,170,.25);transform:translateY(-1px)}
-.sales-pipeline-table .sales-row-open:focus-visible{outline:3px solid rgba(52,120,246,.3);outline-offset:2px}
-.sales-pipeline-table .sales-row-open:active{transform:translateY(0);box-shadow:0 1px 2px rgba(35,91,170,.2)}
-.sales-pipeline-table .sales-row-open span{font-size:14px;line-height:1}
+/* Compact secondary action, matching the portal's understated navy/blue controls */
+.sales-pipeline-table .sales-row-open{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-width:0;padding:7px 11px;margin:0;border:1px solid #dce6f0;border-radius:7px;background:#f5f8fc;color:#2d5e8d;font:700 10px var(--font);letter-spacing:0;white-space:nowrap;cursor:pointer;box-shadow:none;transition:background .15s ease,border-color .15s ease,color .15s ease}
+.sales-pipeline-table .sales-row-open:hover{background:#edf5ff;border-color:#b9d1ef;color:#24558b;box-shadow:0 2px 6px rgba(35,65,100,.07)}
+.sales-pipeline-table .sales-row-open:focus-visible{outline:2px solid #9fc2f3;outline-offset:2px}
+.sales-pipeline-table .sales-row-open:active{background:#e5effb;box-shadow:none}
+.sales-pipeline-table .sales-row-open span{font-size:12px;line-height:1}
