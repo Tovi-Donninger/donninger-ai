@@ -10,6 +10,7 @@ const modules = [
  {id:"management",icon:"▥",name:"Management & Reporting",desc:"Bring business information together, monitor KPIs and prepare management reports.",workflow:["Collect approved data from connected departments","Validate KPI definitions and highlight missing information","Refresh dashboards and recurring reports","Prepare summaries and action lists for management review"],automate:["Scheduled KPI collection and dashboard refresh","Recurring report packs and action reminders","Exception alerts and task tracking"],assist:["Performance summaries and variance explanations","Scenario drafts and management questions"],integrations:["CRM and sales systems","Finance and HR data","Operations and analytics platforms"],stage:"Workflow specification drafted"}
 ];
 let salesPipelineRows=[];
+let salesDrawerRequest=0;
 const loginScreen=document.getElementById("loginScreen"),dashboardScreen=document.getElementById("dashboardScreen");
 const loginForm=document.getElementById("loginForm"),loginError=document.getElementById("loginError");
 function showDashboard(){loginScreen.hidden=true;dashboardScreen.hidden=false;renderCards();showView("overview");}
@@ -162,13 +163,24 @@ function salesAppointmentMarkup(lead){
   (lead.admin_accepted_at?'<p class="lead-drawer-success">'+(lead.prospect_accepted_at?"Customer accepted the Google Calendar invitation.":"Invitation sent. Waiting for the customer to accept.")+'</p>':"")+
  '</div>';
 }
-function openSalesLeadDrawer(leadId){
+async function openSalesLeadDrawer(leadId){
  const lead=salesPipelineRows.find(item=>String(item.lead_id)===String(leadId));
  const overlay=document.getElementById("salesLeadDrawerOverlay"),content=document.getElementById("salesLeadDrawerContent");
  if(!lead||!overlay||!content)return;
+ const requestId=++salesDrawerRequest;
+ overlay.hidden=false;document.body.classList.add("sales-drawer-open");
+ content.innerHTML='<div class="lead-drawer-loading">Loading complete lead record…</div>';
+ let detailWarning="";
+ try{
+  const response=await fetch("/api/sales/leads?id="+encodeURIComponent(leadId),{credentials:"same-origin",cache:"no-store"});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||"Full lead details are not available.");
+  if(data.lead)lead={...data.lead,...lead};
+ }catch(error){detailWarning=error.message;}
+ if(requestId!==salesDrawerRequest)return;
  const name=(lead.first_name+" "+(lead.last_name||"")).trim()||"Unnamed lead";
  const stageOptions=[["contacted","Contacted"],["meeting_requested","Meeting requested"],["meeting_confirmed","Meeting confirmed"],["meeting_completed","Meeting completed"],["converted","Converted"],["lost","Lost"]];
- content.innerHTML='<div class="lead-drawer-header"><div><div class="dash-eyebrow">LEAD RECORD</div><h2>'+escapeHtml(name)+'</h2><p>'+escapeHtml(lead.company||"Company not specified")+'</p></div><button type="button" class="lead-drawer-close" aria-label="Close lead details">×</button></div>'+
+ content.innerHTML=(detailWarning?'<p class="lead-drawer-warning">Some additional record fields could not be loaded: '+escapeHtml(detailWarning)+'</p>':'')+'<div class="lead-drawer-header"><div><div class="dash-eyebrow">LEAD RECORD</div><h2>'+escapeHtml(name)+'</h2><p>'+escapeHtml(lead.company||"Company not specified")+'</p></div><button type="button" class="lead-drawer-close" aria-label="Close lead details">×</button></div>'+
   '<div class="lead-drawer-actions"><a class="lead-drawer-action" href="'+(lead.email?'mailto:'+encodeURIComponent(lead.email):'#')+'" '+(!lead.email?'aria-disabled="true"':'')+'>Email lead ↗</a><a class="lead-drawer-action" href="'+(lead.phone?'tel:'+encodeURIComponent(lead.phone):'#')+'" '+(!lead.phone?'aria-disabled="true"':'')+'>Call lead ↗</a><button type="button" class="lead-drawer-action edit-lead-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Edit details</button></div>'+
   '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Contact information</h3><span class="lead-status-pill">'+escapeHtml(salesStageLabel(lead.pipeline_stage))+'</span></div><div class="lead-drawer-info-grid">'+
   [['Email',lead.email],['Phone',lead.phone],['Job title',lead.job_title],['Company',lead.company],['Contact permission',(lead.contact_permission||"unknown").replaceAll("_"," ")],['Lead ID',lead.lead_id]].map(([label,value])=>'<div><small>'+label+'</small><strong>'+escapeHtml(value||"Not provided")+'</strong></div>').join("")+'</div>'+
@@ -181,6 +193,7 @@ function openSalesLeadDrawer(leadId){
  content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
 }
 function closeSalesLeadDrawer(){
+ salesDrawerRequest++;
  const overlay=document.getElementById("salesLeadDrawerOverlay");if(overlay)overlay.hidden=true;
  document.body.classList.remove("sales-drawer-open");
 }
