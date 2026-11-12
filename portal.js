@@ -47,7 +47,7 @@ async function showSalesWorkspace(){
  <section class="sales-view-section" id="sales-view-pipeline">
   <div class="sales-page-heading"><div><div class="dash-eyebrow">SALES & LEAD GENERATION / ACTIVE WORK</div><h1>Sales Pipeline<span>.</span></h1><p>Track every qualified prospect from first contact through meetings, decisions and conversion.</p></div><button class="portal-button portal-button-primary" type="button" data-sales-goto="lead-capture">＋ Add leads</button></div>
   <div class="sales-process-strip"><span>01 <b>Capture</b></span><i>→</i><span>02 <b>Qualify</b></span><i>→</i><span>03 <b>Contact</b></span><i>→</i><span>04 <b>Meet</b></span><i>→</i><span>05 <b>Close</b></span></div>
-  <section class="dash-card sales-pipeline-card"><div class="sales-leads-heading"><div><div class="dash-eyebrow">LIVE SALES JOURNEY</div><h3>Pipeline stages</h3><p>Move prospects between stages as their sales journey progresses. Customer acceptance is required before a meeting is confirmed.</p></div><button class="text-action" id="refreshSalesPipeline" type="button">Refresh ↻</button></div><div id="salesPipelineSummary" class="sales-pipeline-summary"></div><div class="sales-pipeline-toolbar"><label class="sales-pipeline-search"><span>⌕</span><input id="salesPipelineSearch" type="search" placeholder="Search prospects, companies or email…" autocomplete="off"></label><label class="sales-pipeline-filter">Stage <select id="salesPipelineFilter"><option value="all">All stages</option><option value="contacted">Contacted</option><option value="meeting_requested">Meeting requested</option><option value="meeting_confirmed">Meeting confirmed</option><option value="meeting_completed">Meeting completed</option><option value="converted">Converted</option><option value="lost">Lost</option></select></label></div><p id="salesPipelineCount" class="sales-lead-count">Loading pipeline…</p><div id="salesPipelineBoard" class="sales-pipeline-board"></div></section>
+  <section class="dash-card sales-pipeline-card"><div class="sales-leads-heading"><div><div class="dash-eyebrow">LIVE SALES JOURNEY</div><h3>Pipeline stages</h3><p>Move prospects between stages as their sales journey progresses. Customer acceptance is required before a meeting is confirmed.</p></div><button class="text-action" id="refreshSalesPipeline" type="button">Refresh ↻</button></div><div id="salesPipelineSummary" class="sales-pipeline-summary"></div><div class="sales-pipeline-toolbar"><label class="sales-pipeline-search"><span>⌕</span><input id="salesPipelineSearch" type="search" placeholder="Search prospects, companies or email…" autocomplete="off"></label><label class="sales-pipeline-filter">Stage <select id="salesPipelineFilter"><option value="all">All stages</option><option value="contacted">Contacted</option><option value="meeting_requested">Meeting requested</option><option value="meeting_confirmed">Meeting confirmed</option><option value="meeting_completed">Meeting completed</option><option value="converted">Converted</option><option value="lost">Lost</option></select></label></div><p id="salesPipelineCount" class="sales-lead-count">Loading pipeline…</p><div id="salesPipelineBoard" class="sales-table-wrap sales-pipeline-table-wrap"></div><div id="salesLeadDrawerOverlay" class="sales-lead-drawer-overlay" hidden><aside class="sales-lead-drawer" role="dialog" aria-modal="true" aria-label="Lead details"><div id="salesLeadDrawerContent"></div></aside></div></section>
   <section class="dash-card sales-appointments-card"><div class="sales-leads-heading"><div><div class="dash-eyebrow">MEETING MANAGEMENT</div><h3>Meeting requests & confirmations</h3><p>Review proposed times, approve or decline requests, and monitor customer RSVP status.</p></div><button class="text-action" id="refreshSalesAppointments" type="button">Refresh ↻</button></div><p id="salesAppointmentsCount" class="sales-lead-count">Loading meeting requests…</p><div id="salesAppointmentsBoard" class="sales-pipeline-board"></div></section>
  </section>
  <section class="sales-view-section" id="sales-view-lead-capture" hidden>
@@ -130,12 +130,60 @@ async function loadSalesLeads(){
 }
 
 async function loadSalesPipeline(){
- const count=document.getElementById('salesPipelineCount'),host=document.getElementById('salesPipelineBoard');if(!host)return;count.textContent='Loading sales pipeline…';
- try{const r=await fetch('/api/sales/pipeline',{credentials:'same-origin',cache:'no-store'}),d=await r.json();if(!r.ok)throw new Error(d.error||'Could not load sales pipeline.');const rows=d.pipeline_leads||[];salesPipelineRows=rows;count.textContent=rows.length+' leads currently in active sales stages';
- const stages=[['contacted','Contacted Leads'],['meeting_requested','Meeting Requested'],['meeting_confirmed','Meeting Confirmed'],['meeting_completed','Meeting Completed'],['converted','Converted'],['lost','Lost']];
- host.innerHTML=stages.map(([stage,label])=>{const items=rows.filter(v=>v.pipeline_stage===stage);const options=stages.filter(([value])=>value!==stage).map(([value,label])=>'<option value="'+value+'">'+label+'</option>').join('');return '<section class="sales-pipeline-column"><header><strong>'+label+'</strong><span>'+items.length+'</span></header>'+(items.length?items.map(v=>'<article class="sales-pipeline-lead"><strong>'+escapeHtml((v.first_name+' '+(v.last_name||'')).trim())+'</strong><small>'+escapeHtml(v.company||'')+' · '+escapeHtml(v.email||'')+'</small><p>'+escapeHtml(v.customer_need||'No customer need recorded')+'</p>'+(v.pipeline_stage==="meeting_requested"&&v.appointment_id?(()=>{let opts=[];try{opts=JSON.parse(v.meeting_options_json||"[]");if(!Array.isArray(opts))opts=[];}catch{}const tz=v.prospect_timezone||v.appointment_timezone||"Timezone not specified";const availability=v.availability_status==="available"?"Selected time is available":v.availability_status==="no_available_options"?"All proposed options conflict":v.availability_status==="needs_clarification"?"More date/time details required":"Calendar availability not checked yet";const choices=opts.map((o,i)=>'<label class="meeting-option-choice"><input type="radio" name="meeting-option-'+escapeHtml(v.appointment_id)+'" value="'+i+'" '+(v.requested_start_at&&new Date(v.requested_start_at).getTime()===new Date(o.start_iso||0).getTime()?'checked':'')+' '+(v.admin_accepted_at?'disabled':'')+'><span>'+escapeHtml(o.original_text||"Option "+(i+1))+' — '+escapeHtml(o.start_iso?new Date(o.start_iso).toLocaleString(undefined,{timeZone:o.timezone||tz}):"Date/time unclear")+' ('+escapeHtml(o.timezone||tz)+')</span></label>').join('');return '<div class="meeting-pipeline-details"><p><strong>Meeting request:</strong> '+escapeHtml(v.discussion_summary||"Prospect requested a meeting")+'</p><p><strong>Availability:</strong> '+escapeHtml(availability)+'</p><p><strong>Selected time:</strong> '+escapeHtml(v.requested_start_at?new Date(v.requested_start_at).toLocaleString(undefined,{timeZone:tz}):"No time selected")+'</p><p><strong>Timezone:</strong> '+escapeHtml(tz)+'</p>'+(choices?'<fieldset class="meeting-option-list"><legend>Select a proposed time</legend>'+choices+'</fieldset>':'<p>The AI could not confidently extract a complete date, time and timezone. Review the email and ask the customer to clarify.</p>')+(!v.admin_accepted_at?'<button type="button" class="portal-button portal-button-secondary meeting-check-time-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'">Check selected time</button>':'')+'<p class="meeting-check-status">'+escapeHtml(v.availability_status==="available"?"Selected time is available":v.availability_status==="not_available"?"Selected time is unavailable":"Select an option and check availability")+'</p>'+(v.appointment_status==="requested"&&!v.admin_accepted_at&&v.availability_status==="available"&&v.requested_start_at?'<div class="meeting-approval-actions"><button type="button" class="portal-button portal-button-primary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="accept">Approve &amp; send invitation</button><button type="button" class="portal-button portal-button-secondary meeting-decision-button" data-appointment-id="'+escapeHtml(v.appointment_id)+'" data-decision="decline">Decline</button></div>':"")+(v.admin_accepted_at?'<p>Donninger support approval recorded. Waiting for the customer to accept the Calendar invitation.</p>':"")+'</div>'})():"")+'<label>Update stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(v.lead_id)+'"><option value="'+stage+'" selected>'+label+'</option>'+options+'</select></label><button type="button" class="sales-email-history-button" data-lead-id="'+escapeHtml(v.lead_id)+'">View email history</button><div class="sales-email-history" hidden></div></article>').join(''):'<div class="sales-empty-state">No leads in this stage.</div>')+'</section>';}).join('');
- renderSalesPipeline();
- }catch(e){count.textContent='Unable to load pipeline';host.textContent=e.message;}
+ const count=document.getElementById("salesPipelineCount"),host=document.getElementById("salesPipelineBoard");
+ if(!host||!count)return;
+ count.textContent="Loading sales pipeline…";
+ try{
+  const response=await fetch("/api/sales/pipeline",{credentials:"same-origin",cache:"no-store"});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||"Could not load sales pipeline.");
+  salesPipelineRows=data.pipeline_leads||[];
+  renderSalesPipeline();
+ }catch(error){count.textContent="Unable to load pipeline";host.innerHTML='<div class="sales-empty-state">'+escapeHtml(error.message)+'</div>';}
+}
+
+function salesStageLabel(stage){
+ return ({contacted:"Contacted",meeting_requested:"Meeting requested",meeting_confirmed:"Meeting confirmed",meeting_completed:"Meeting completed",converted:"Converted",lost:"Lost"})[stage]||"New lead";
+}
+function salesAppointmentMarkup(lead){
+ if(!lead.appointment_id)return '<div class="lead-drawer-empty">No appointment request is linked to this lead yet.</div>';
+ let options=[];try{options=JSON.parse(lead.meeting_options_json||"[]");if(!Array.isArray(options))options=[];}catch{options=[];}
+ const timezone=lead.prospect_timezone||lead.appointment_timezone||"Timezone not specified";
+ const available=lead.availability_status==="available";
+ const availability=lead.availability_status==="available"?"Selected time is available":lead.availability_status==="no_available_options"?"All proposed times conflict":lead.availability_status==="needs_clarification"?"More date/time details are needed":lead.availability_status==="not_available"?"Selected time is unavailable":"Calendar availability has not been checked";
+ const choices=options.map((option,index)=>'<label class="lead-drawer-option"><input type="radio" name="meeting-option-'+escapeHtml(lead.appointment_id)+'" value="'+index+'" '+(lead.requested_start_at&&new Date(lead.requested_start_at).getTime()===new Date(option.start_iso||0).getTime()?'checked':'')+' '+(lead.admin_accepted_at?'disabled':'')+'><span>'+escapeHtml(option.original_text||("Option "+(index+1)))+'<small>'+escapeHtml(option.start_iso?new Date(option.start_iso).toLocaleString(undefined,{timeZone:option.timezone||timezone}):"Date/time unclear")+' · '+escapeHtml(option.timezone||timezone)+'</small></span></label>').join("");
+ const when=lead.requested_start_at?new Date(lead.requested_start_at).toLocaleString(undefined,{timeZone:timezone}):"No time selected yet";
+ return '<div class="lead-drawer-appointment"><div class="lead-drawer-appointment-top"><strong>Appointment request</strong><span class="lead-status-pill">'+escapeHtml(lead.appointment_status||"requested")+'</span></div>'+
+  (lead.discussion_summary?'<p>'+escapeHtml(lead.discussion_summary)+'</p>':"")+
+  '<dl><div><dt>Selected time</dt><dd>'+escapeHtml(when)+'</dd></div><div><dt>Availability</dt><dd>'+escapeHtml(availability)+'</dd></div><div><dt>Timezone</dt><dd>'+escapeHtml(timezone)+'</dd></div><div><dt>Admin approval</dt><dd>'+(lead.admin_accepted_at?"Approved":"Awaiting review")+'</dd></div><div><dt>Customer RSVP</dt><dd>'+(lead.prospect_accepted_at?"Accepted":lead.admin_accepted_at?"Awaiting response":"Not invited yet")+'</dd></div></dl>'+
+  (options.length&&!lead.admin_accepted_at?'<fieldset class="lead-drawer-options"><legend>Choose a proposed time</legend>'+choices+'</fieldset>':"")+
+  (!options.length&&!lead.admin_accepted_at?'<p class="lead-drawer-warning">The email did not contain a complete, clear date and time. Review the email history and ask the customer to clarify.</p>':"")+
+  (!lead.admin_accepted_at?'<button type="button" class="portal-button portal-button-secondary meeting-check-time-button" data-appointment-id="'+escapeHtml(lead.appointment_id)+'">Check selected time</button><p class="meeting-check-status">'+(available?"Selected time is available":"Select a proposed time and check availability")+'</p>':"")+
+  (lead.appointment_status==="requested"&&!lead.admin_accepted_at&&available&&lead.requested_start_at?'<div class="meeting-approval-actions"><button type="button" class="portal-button portal-button-primary meeting-decision-button" data-appointment-id="'+escapeHtml(lead.appointment_id)+'" data-decision="accept">Approve &amp; send Google invitation</button><button type="button" class="portal-button portal-button-secondary meeting-decision-button" data-appointment-id="'+escapeHtml(lead.appointment_id)+'" data-decision="decline">Decline</button></div>':"")+
+  (lead.admin_accepted_at?'<p class="lead-drawer-success">'+(lead.prospect_accepted_at?"Customer accepted the Google Calendar invitation.":"Invitation sent. Waiting for the customer to accept.")+'</p>':"")+
+ '</div>';
+}
+function openSalesLeadDrawer(leadId){
+ const lead=salesPipelineRows.find(item=>String(item.lead_id)===String(leadId));
+ const overlay=document.getElementById("salesLeadDrawerOverlay"),content=document.getElementById("salesLeadDrawerContent");
+ if(!lead||!overlay||!content)return;
+ const name=(lead.first_name+" "+(lead.last_name||"")).trim()||"Unnamed lead";
+ const stageOptions=[["contacted","Contacted"],["meeting_requested","Meeting requested"],["meeting_confirmed","Meeting confirmed"],["meeting_completed","Meeting completed"],["converted","Converted"],["lost","Lost"]];
+ content.innerHTML='<div class="lead-drawer-header"><div><div class="dash-eyebrow">LEAD RECORD</div><h2>'+escapeHtml(name)+'</h2><p>'+escapeHtml(lead.company||"Company not specified")+'</p></div><button type="button" class="lead-drawer-close" aria-label="Close lead details">×</button></div>'+
+  '<div class="lead-drawer-actions"><a class="lead-drawer-action" href="'+(lead.email?'mailto:'+encodeURIComponent(lead.email):'#')+'" '+(!lead.email?'aria-disabled="true"':'')+'>Email lead ↗</a><a class="lead-drawer-action" href="'+(lead.phone?'tel:'+encodeURIComponent(lead.phone):'#')+'" '+(!lead.phone?'aria-disabled="true"':'')+'>Call lead ↗</a><button type="button" class="lead-drawer-action edit-lead-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Edit details</button></div>'+
+  '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Contact information</h3><span class="lead-status-pill">'+escapeHtml(salesStageLabel(lead.pipeline_stage))+'</span></div><div class="lead-drawer-info-grid">'+
+  [['Email',lead.email],['Phone',lead.phone],['Job title',lead.job_title],['Company',lead.company],['Contact permission',(lead.contact_permission||"unknown").replaceAll("_"," ")],['Lead ID',lead.lead_id]].map(([label,value])=>'<div><small>'+label+'</small><strong>'+escapeHtml(value||"Not provided")+'</strong></div>').join("")+'</div>'+
+  (lead.customer_need?'<div class="lead-drawer-need"><small>Customer need / reason for enquiry</small><p>'+escapeHtml(lead.customer_need)+'</p></div>':"")+
+  '<label class="lead-drawer-stage">Pipeline stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(lead.lead_id)+'">'+stageOptions.map(([value,label])=>'<option value="'+value+'" '+(lead.pipeline_stage===value?"selected":"")+'>'+label+'</option>').join("")+'</select></label></section>'+
+  '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Appointments</h3></div>'+salesAppointmentMarkup(lead)+'</section>'+
+  '<section class="lead-drawer-section lead-drawer-email-section"><div class="lead-drawer-section-heading"><div><h3>Email history</h3><p>Recorded incoming and outgoing messages for this lead.</p></div><button type="button" class="text-action sales-email-history-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Load email history ↻</button></div><div class="sales-email-history lead-drawer-email-history" hidden></div></section>'+
+  '<section class="lead-drawer-section"><h3>Sales notes</h3><p class="lead-drawer-muted">The original enquiry and recorded email analysis are shown above. Use the lead database to update the contact record.</p></section>';
+ document.querySelectorAll(".sales-pipeline-row").forEach(row=>row.removeAttribute("aria-current"));document.querySelector('.sales-pipeline-row[data-lead-id="'+CSS.escape(String(leadId))+'"]')?.setAttribute("aria-current","true");overlay.hidden=false;document.body.classList.add("sales-drawer-open");
+ content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
+}
+function closeSalesLeadDrawer(){
+ const overlay=document.getElementById("salesLeadDrawerOverlay");if(overlay)overlay.hidden=true;
+ document.body.classList.remove("sales-drawer-open");
 }
 
 async function loadSalesAppointments(){
@@ -216,6 +264,7 @@ async function loadQualificationProfile(){
  try{const r=await fetch("/api/sales/qualification-profile",{credentials:"same-origin"}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load profile.");Object.entries(d.profile?.criteria||{}).forEach(([k,v])=>{const f=form.elements.namedItem(k);if(f)f.value=v||"";});status.textContent=d.profile?"Profile version "+d.profile.version+" loaded.":"No profile saved yet.";}catch(e){status.textContent=e.message;}
  const select=document.getElementById("qualificationLeadSelect");if(select){const r=await fetch("/api/sales/leads",{credentials:"same-origin"}),d=await r.json();if(r.ok)select.innerHTML='<option value="">Select a prospect…</option>'+(d.leads||[]).map(l=>'<option value="'+escapeHtml(l.id)+'">'+escapeHtml((l.first_name+" "+(l.last_name||"")).trim())+(l.company?" · "+escapeHtml(l.company):"")+'</option>').join("");}
 }
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeSalesLeadDrawer();});
 document.getElementById("functionDetailContent").addEventListener("change",async e=>{
  const select=e.target.closest(".pipeline-stage-select");if(!select)return;const leadId=select.dataset.leadId,stage=select.value;select.disabled=true;
  try{const r=await fetch("/api/sales/pipeline",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_id:leadId,stage})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not update pipeline stage.");await loadSalesPipeline();await loadQualifiedLeads();await loadUnqualifiedLeads();}
@@ -227,6 +276,11 @@ document.getElementById("functionDetailContent").addEventListener("submit",async
  try{const r=await fetch("/api/sales/qualification-profile",{method:"PUT",headers:{"content-type":"application/json"},credentials:"same-origin",body:JSON.stringify({criteria:Object.fromEntries(new FormData(form).entries())})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not save profile.");s.textContent="Saved · Profile version "+d.profile.version;}catch(err){s.textContent=err.message;}finally{b.disabled=false;}
 });
 document.getElementById("functionDetailContent").addEventListener("click",async e=>{
+ const pipelineRow=e.target.closest(".sales-pipeline-row");
+ if(pipelineRow){openSalesLeadDrawer(pipelineRow.dataset.leadId);return;}
+ if(e.target.closest(".lead-drawer-close")){closeSalesLeadDrawer();return;}
+ if(e.target.id==="salesLeadDrawerOverlay"){closeSalesLeadDrawer();return;}
+
  const editButton=e.target.closest(".edit-lead-button");
  if(editButton){
   const leadId=editButton.dataset.leadId;editButton.disabled=true;
@@ -304,7 +358,7 @@ document.getElementById("functionDetailContent").addEventListener("click",async 
    const response=await fetch("/api/sales/appointments/respond",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({appointment_id:appointmentId,decision})});
    const result=await response.json();
    if(!response.ok)throw new Error(result.error||"Could not process the meeting decision.");
-   await loadSalesAppointments();await loadSalesPipeline();
+   await loadSalesAppointments();await loadSalesPipeline();if(!document.getElementById("salesLeadDrawerOverlay")?.hidden){const active=document.querySelector(".sales-pipeline-row[aria-current=\"true\"]");if(active)openSalesLeadDrawer(active.dataset.leadId);}
    if(result.email_sent===false)throw new Error(result.error||"Approval saved, but the client email was not sent.");
    if(count)count.textContent=result.message||"Meeting decision saved.";
   }catch(error){
@@ -459,25 +513,21 @@ function renderSalesPipeline(){
  const host=document.getElementById("salesPipelineBoard");if(!host)return;
  const search=(document.getElementById("salesPipelineSearch")?.value||"").trim().toLowerCase();
  const filter=document.getElementById("salesPipelineFilter")?.value||"all";
- const metrics=[["Active prospects",salesPipelineRows.length],["Meetings requested",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_requested").length],["Meetings confirmed",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_confirmed").length],["Converted",salesPipelineRows.filter(v=>v.pipeline_stage==="converted").length]];
+ const rows=salesPipelineRows.filter(lead=>{
+  const matchesSearch=!search||[lead.first_name,lead.last_name,lead.company,lead.email,lead.phone,lead.customer_need].some(value=>String(value||"").toLowerCase().includes(search));
+  return matchesSearch&&(filter==="all"||lead.pipeline_stage===filter);
+ });
+ const metrics=[["All prospects",salesPipelineRows.length],["Awaiting meeting",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_requested").length],["Meetings confirmed",salesPipelineRows.filter(v=>v.pipeline_stage==="meeting_confirmed").length],["Converted",salesPipelineRows.filter(v=>v.pipeline_stage==="converted").length]];
  const summary=document.getElementById("salesPipelineSummary");
  if(summary)summary.innerHTML=metrics.map(([label,value])=>'<div class="sales-pipeline-metric"><span>'+label+'</span><strong>'+value+'</strong></div>').join("");
- let visible=0;
- host.querySelectorAll(".sales-pipeline-column").forEach(column=>{
-  const header=column.querySelector("header strong")?.textContent||"";
-  const stageMap={"Contacted Leads":"contacted","Meeting Requested":"meeting_requested","Meeting Confirmed":"meeting_confirmed","Meeting Completed":"meeting_completed","Converted":"converted","Lost":"lost"};
-  const stage=stageMap[header]||"";
-  let inColumn=0;
-  column.querySelectorAll(".sales-pipeline-lead").forEach(card=>{
-   const select=card.querySelector(".pipeline-stage-select");
-   const cardStage=select?.value||stage;
-   const matchesSearch=!search||card.textContent.toLowerCase().includes(search);
-   const matchesStage=filter==="all"||cardStage===filter;
-   card.hidden=!(matchesSearch&&matchesStage);if(!card.hidden){visible++;inColumn++;}
-  });
-  const count=column.querySelector("header span");if(count)count.textContent=String(inColumn);
-  column.hidden=filter!=="all"&&stage!==filter;
- });
  const count=document.getElementById("salesPipelineCount");
- if(count)count.textContent=visible+" prospect"+(visible===1?"":"s")+" shown"+(search||filter!=="all"?" after filters":" in the pipeline");
+ if(count)count.textContent=rows.length+" of "+salesPipelineRows.length+" leads shown";
+ host.innerHTML=rows.length?'<table class="sales-lead-table sales-pipeline-table"><thead><tr><th>Lead</th><th>Company</th><th>Contact</th><th>Pipeline stage</th><th>Appointment</th><th>Last activity</th><th>Next action</th><th></th></tr></thead><tbody>'+
+  rows.map(lead=>{
+   const name=(lead.first_name+" "+(lead.last_name||"")).trim()||"Unnamed lead";
+   const meeting=lead.appointment_id?(lead.prospect_accepted_at?"Customer accepted":lead.admin_accepted_at?"Invitation sent":lead.availability_status==="available"?"Ready for approval":"Request received"):"No appointment";
+   const activity=lead.latest_email_at||lead.last_activity_at||lead.updated_at||lead.created_at;
+   const next=lead.appointment_id?(lead.admin_accepted_at&&!lead.prospect_accepted_at?"Await RSVP":!lead.admin_accepted_at?"Review appointment":"Prepare for meeting"):lead.pipeline_stage==="contacted"?"Follow up":"Review lead";
+   return '<tr class="sales-pipeline-row" data-lead-id="'+escapeHtml(lead.lead_id)+'" tabindex="0" role="button" aria-label="Open '+escapeHtml(name)+' details"><td><strong>'+escapeHtml(name)+'</strong><small>'+escapeHtml(lead.job_title||"")+'</small></td><td>'+escapeHtml(lead.company||"—")+'</td><td>'+escapeHtml(lead.email||lead.phone||"—")+'</td><td><span class="sales-stage">'+escapeHtml(salesStageLabel(lead.pipeline_stage))+'</span></td><td><span class="sales-appointment-status">'+escapeHtml(meeting)+'</span></td><td>'+escapeHtml(activity?new Date(activity).toLocaleDateString():"—")+'</td><td>'+escapeHtml(next)+'</td><td><span class="sales-row-open">View →</span></td></tr>';
+  }).join("")+'</tbody></table>':'<div class="sales-empty-state">'+(salesPipelineRows.length?"No leads match these filters.":"No leads are currently in the sales pipeline.")+'</div>';
 }
