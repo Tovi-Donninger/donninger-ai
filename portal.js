@@ -170,7 +170,7 @@ function salesAppointmentMarkup(lead){
  '</div>';
 }
 async function openSalesLeadDrawer(leadId){
- const lead=salesPipelineRows.find(item=>String(item.lead_id)===String(leadId));
+ let lead=salesPipelineRows.find(item=>String(item.lead_id)===String(leadId));
  const overlay=document.getElementById("salesLeadDrawerOverlay"),content=document.getElementById("salesLeadDrawerContent");
  if(!lead||!overlay||!content)return;
  const requestId=++salesDrawerRequest;
@@ -194,10 +194,18 @@ async function openSalesLeadDrawer(leadId){
   '<label class="lead-drawer-stage">Pipeline stage<select class="pipeline-stage-select" data-lead-id="'+escapeHtml(lead.lead_id)+'">'+stageOptions.map(([value,label])=>'<option value="'+value+'" '+(lead.pipeline_stage===value?"selected":"")+'>'+label+'</option>').join("")+'</select></label></section>'+
   '<section class="lead-drawer-section"><div class="lead-drawer-section-heading"><h3>Appointments</h3></div>'+salesAppointmentMarkup(lead)+'</section>'+
   '<section class="lead-drawer-section lead-drawer-email-section" id="leadEmailConversation"><div class="lead-drawer-section-heading"><div><div class="dash-eyebrow">CONVERSATION TIMELINE</div><h3>Email conversation</h3><p>Full incoming and outgoing email messages, in chronological order.</p></div><button type="button" class="portal-button portal-button-secondary sales-email-history-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Load conversation ↓</button></div><div class="sales-email-history lead-drawer-email-history" hidden></div></section>'+
+  '<section class="lead-drawer-section"><h3>Email follow-ups</h3><p>First follow-up after 3 business days, then weekly. Maximum 3 follow-ups. Replies stop the sequence. Business week: Sunday–Thursday; sending hours: 09:00–17:00 Israel time.</p><p id="leadFollowupStatus" role="status">Loading follow-up status…</p><div class="lead-drawer-actions">'+['pause','resume','cancel','stop'].map(action=>'<button type="button" class="portal-button portal-button-secondary outreach-control" data-lead-id="'+escapeHtml(leadId)+'" data-action="'+action+'">'+({pause:'Pause follow-ups',resume:'Resume paused follow-ups',cancel:'Cancel follow-ups',stop:'Stop all sales emails'})[action]+'</button>').join('')+'</div></section>'+
   '<section class="lead-drawer-section"><h3>Sales notes</h3><p class="lead-drawer-muted">The original enquiry and recorded email analysis are shown above. Use the lead database to update the contact record.</p></section>'+
   (lead.appointment_status==="confirmed"?'<div class="meeting-prep-footer"><button type="button" class="portal-button portal-button-primary meeting-prep-button" data-lead-id="'+escapeHtml(lead.lead_id)+'">Prepare for meeting <span>✦</span></button></div>':"");
  document.querySelectorAll(".sales-pipeline-row").forEach(row=>row.removeAttribute("aria-current"));document.querySelector('.sales-pipeline-row[data-lead-id="'+CSS.escape(String(leadId))+'"]')?.setAttribute("aria-current","true");overlay.hidden=false;document.body.classList.add("sales-drawer-open");
  content.querySelector(".lead-drawer-close")?.addEventListener("click",closeSalesLeadDrawer);
+ const followupStatus=content.querySelector("#leadFollowupStatus");
+ fetch("/api/sales/followups?lead_id="+encodeURIComponent(leadId),{credentials:"same-origin",cache:"no-store"}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||"Could not load follow-ups");const f=d.followup;followupStatus.textContent=f?f.status+" · "+f.sent_count+" of 3 follow-ups sent"+(f.status==="active"?" · Next eligible: "+new Date(f.next_at).toLocaleString():"")+(f.reason?" · "+f.reason:""):"No follow-up sequence. New outreach starts one automatically.";}).catch(e=>followupStatus.textContent=e.message);
+ content.querySelectorAll(".outreach-control").forEach(button=>button.addEventListener("click",async()=>{
+  button.disabled=true;
+  try{const r=await fetch("/api/sales/followups",{method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify({lead_id:leadId,action:button.dataset.action})}),d=await r.json();if(!r.ok)throw new Error(d.error||"Could not update outreach");await openSalesLeadDrawer(leadId);}
+  catch(e){followupStatus.textContent=e.message;button.disabled=false;}
+ }));
 
 }
 async function prepareMeetingBrief(leadId,prepareButton){

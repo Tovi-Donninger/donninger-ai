@@ -1,0 +1,7 @@
+.git/
+worker.js
+sales-followups.js
+wrangler.jsonc
+migrations/
+tests/
+docs/

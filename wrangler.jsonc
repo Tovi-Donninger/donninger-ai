@@ -2,6 +2,8 @@
   "name": "donninger-ai",
   "main": "worker.js",
   "compatibility_date": "2026-11-08",
+  "triggers": { "crons": ["*/15 * * * *"] },
+  "vars": { "SALES_TIMEZONE": "Asia/Jerusalem", "SALES_WEEKEND": "Fri,Sat" },
   "assets": {
     "directory": ".",
     "binding": "ASSETS",

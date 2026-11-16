@@ -1,3 +1,4 @@
+import { stopRequest, suppressEmail, isSuppressed, cancelFollowups, enrollFollowups, processFollowups } from "./sales-followups.js";
 const SESSION_COOKIE = "donninger_admin_session";
 const SESSION_SECONDS = 8 * 60 * 60;
 
@@ -134,6 +135,7 @@ async function handleSalesLeads(request, env) {
     if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))return json({error:"Enter a valid email address."},400);
     const existing=await env.DB.prepare("SELECT id FROM leads WHERE id=? AND organisation_id=?").bind(leadId,organisationId).first();
     if(!existing)return json({error:"Lead not found."},404);
+    if(contactPermission==="do_not_contact")await suppressEmail(env.DB,organisationId,email,"Marked do not contact by admin");
     await env.DB.prepare("UPDATE leads SET first_name=?,last_name=?,email=?,phone=?,company=?,job_title=?,customer_need=?,contact_permission=?,updated_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=? AND organisation_id=?").bind(firstName,lastName,email,phone,company,jobTitle,customerNeed,contactPermission,leadId,organisationId).run();
     await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'lead_updated',?,?)").bind(crypto.randomUUID(),organisationId,leadId,JSON.stringify({fields_updated:["first_name","last_name","email","phone","company","job_title","customer_need","contact_permission"]}),auth.session.email).run();
     return json({success:true,lead_id:leadId});
@@ -1025,6 +1027,7 @@ async function handleSalesOutreachDrafts(request, env) {
     const lead = await env.DB.prepare("SELECT l.id,l.first_name,l.last_name,l.email,l.company,l.job_title,l.customer_need,l.contact_permission,q.fit_score,q.priority,q.qualification_summary,q.qualification_json FROM qualified_leads q JOIN leads l ON l.id=q.lead_id WHERE q.organisation_id=? AND l.organisation_id=? AND l.id=? LIMIT 1").bind(org,org,leadId).first();
     if (!lead) { skipped.push({lead_id:leadId,reason:"Lead is no longer in Qualified Leads."}); continue; }
     if (!lead.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lead.email)) { skipped.push({lead_id:leadId,reason:"A valid email address is required."}); continue; }
+    if (await isSuppressed(env.DB,org,lead.email)) { skipped.push({lead_id:leadId,reason:"This email address has opted out."}); continue; }
     if (lead.contact_permission !== "consent_given") { skipped.push({lead_id:leadId,reason:lead.contact_permission==="do_not_contact"?"This lead is marked Do Not Contact.":"Recorded email consent is required for this development outreach test."}); continue; }
     const prompt = "Write one concise, individually personalised B2B introduction email from Donninger.AI to this qualified prospect. Use only supplied lead facts and qualification evidence. Do not invent facts about the prospect, company, products, prices, savings, results, integrations, testimonials or availability. Donninger.AI is still in development; describe its intended service honestly as helping businesses identify suitable automation opportunities and, where agreed, plan implementation and ongoing support. Do not claim the platform or all automations are already live. Use a natural, warm, personal and professional tone, as a genuine one-to-one business email from Donninger.AI, never like a mass-marketing message. Mention the prospect's recorded need specifically. Say that we would like to get in touch and learn a little more about their business and discuss how Donninger.AI may be able to help. Politely suggest a short introductory Zoom meeting and ask whether they could suggest or confirm a suitable date and time. Make it easy for them to reply with their availability; do not invent meeting slots or imply a meeting is already booked. Do not mention that this email is automated, AI-generated, written by a bot, or a template. Do not use phrases such as automated reply, AI-generated, or do not reply. Do not pretend to be a named human or make false claims about who is writing. Return JSON only.\\n\\nLEAD FACTS:\\n"+JSON.stringify({first_name:lead.first_name,last_name:lead.last_name,company:lead.company,job_title:lead.job_title,customer_need:lead.customer_need,fit_score:lead.fit_score,priority:lead.priority,qualification_summary:lead.qualification_summary,qualification_evidence:lead.qualification_json});
     const schema={type:"OBJECT",properties:{subject:{type:"STRING"},body:{type:"STRING"}},required:["subject","body"]};
@@ -1070,6 +1073,7 @@ async function handleSalesOutreachSend(request, env) {
     if (!lead) { skipped.push({lead_id:leadId,reason:"Lead is no longer in Qualified Leads."}); continue; }
     const recipient = String(lead.email || "").trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipient)) { skipped.push({lead_id:leadId,reason:"A valid email address is required."}); continue; }
+    if (await isSuppressed(env.DB,org,lead.email)) { skipped.push({lead_id:leadId,reason:"This email address has opted out."}); continue; }
     if (lead.contact_permission !== "consent_given") { skipped.push({lead_id:leadId,reason:lead.contact_permission==="do_not_contact"?"This lead has opted out or is marked Do Not Contact.":"Recorded email consent is required. No email was sent."}); continue; }
     const prior = await env.DB.prepare("SELECT id FROM sales_messages WHERE organisation_id=? AND lead_id=? AND direction='outbound' AND channel='email' AND status='sent' ORDER BY created_at DESC LIMIT 1").bind(org,lead.id).first();
     if (prior) { skipped.push({lead_id:leadId,reason:"An outbound email is already recorded as sent. Duplicate sending is blocked."}); continue; }
@@ -1085,6 +1089,7 @@ async function handleSalesOutreachSend(request, env) {
   const sent = [], failed = [];
   for (const draft of draftData.drafts) {
     try {
+      if (await isSuppressed(env.DB,org,draft.recipient)) { skipped.push({lead_id:draft.lead_id,reason:"Email address opted out before sending."}); continue; }
       const upstream = await fetch(GOOGLE_APPS_SCRIPT_URL, {
         method:"POST",
         headers:{"content-type":"application/json"},
@@ -1113,6 +1118,7 @@ async function handleSalesOutreachSend(request, env) {
       if (previousStage && previousStage.pipeline_stage !== "contacted") {
         await env.DB.prepare("INSERT INTO sales_activity (id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'pipeline_stage_changed',?,?)").bind(crypto.randomUUID(),org,draft.lead_id,JSON.stringify({from:previousStage.pipeline_stage,to:"contacted",reason:"Initial outreach email confirmed sent by Gmail"}),auth.session.email).run();
       }
+      await enrollFollowups(env.DB,org,draft.lead_id,draft.message_id);
       sent.push({lead_id:draft.lead_id,name:draft.name,recipient:draft.recipient,subject:draft.subject});
     } catch(error) {
       failed.push({lead_id:draft.lead_id,recipient:draft.recipient,reason:"Gmail send request failed. Check the inbox before retrying."});
@@ -1175,6 +1181,13 @@ async function handleSalesReplyIngest(request, env) {
     "SELECT id,first_name,last_name,email,company,contact_permission,pipeline_stage FROM leads WHERE organisation_id=? AND lower(email)=? ORDER BY created_at DESC LIMIT 1"
   ).bind(org, sender).first();
   if (!lead) return json({ success: true, ignored: true, reason: "No matching lead." });
+  await cancelFollowups(env.DB,org,lead.id,"Inbound reply received");
+  if (stopRequest(messageText) || lead.contact_permission === "do_not_contact" || await isSuppressed(env.DB,org,sender)) {
+    await suppressEmail(env.DB,org,sender,"Unsubscribe request");
+    await env.DB.prepare("INSERT OR IGNORE INTO sales_email_messages (id,organisation_id,lead_id,gmail_message_id,gmail_thread_id,direction,sender_email,recipient_email,subject,body_text,intent,received_at) VALUES (?,?,?,?,?,'inbound',?,?,?,?,?,?)")
+      .bind(crypto.randomUUID(),org,lead.id,messageId,threadId,sender,recipient,subject,messageText,"unsubscribe",receivedAt||new Date().toISOString()).run();
+    return json({success:true,lead_id:lead.id,intent:"unsubscribe",do_not_contact:true,ai_replied:false});
+  }
   if (!env.GEMINI_API_KEY) return json({ error: "AI reply analysis is not configured." }, 503);
 
   const model = String(env.GEMINI_MODEL || "gemini-3.5-flash-lite").trim();
@@ -1272,7 +1285,8 @@ async function handleSalesReplyIngest(request, env) {
     }
     statements.push(env.DB.prepare("UPDATE leads SET pipeline_stage=?,status=?,updated_at=? WHERE id=? AND organisation_id=?").bind("meeting_requested","proposal",meetingNow,lead.id,org));
   }else if (intent === "unsubscribe") {
-    outboundReply = "Hi " + (lead.first_name || "there") + ",\n\nThank you for letting us know. We've recorded your request and will not send you further sales emails.\n\nKind regards,\nTovi Donninger\nFounder, Donninger.AI";
+    await suppressEmail(env.DB,org,sender,"AI classified unsubscribe");
+    outboundReply = "";
     statements.push(env.DB.prepare("UPDATE leads SET contact_permission='do_not_contact',updated_at=? WHERE id=? AND organisation_id=?").bind(now,lead.id,org));
   } else if (intent === "not_interested") {
     outboundReply = "Hi " + (lead.first_name || "there") + ",\n\nThank you for letting us know. I appreciate your time and won't follow up further.\n\nKind regards,\nTovi Donninger\nFounder, Donninger.AI";
@@ -1280,7 +1294,7 @@ async function handleSalesReplyIngest(request, env) {
     outboundReply = suggestedReply;
   }
 
-  if (!meetingBooked && intent !== "auto_reply" && outboundReply.trim()) {
+  if (!meetingBooked && intent !== "auto_reply" && outboundReply.trim() && !await isSuppressed(env.DB,org,sender)) {
     const replyBody = addFounderSignature(outboundReply);
     const sent = await sendMeetingEmail(env,{
       action:"send_sales_reply",
@@ -1297,8 +1311,29 @@ async function handleSalesReplyIngest(request, env) {
   return json({ success:true, lead_id:lead.id, intent, summary, ai_replied:!meetingBooked && intent!=="auto_reply" && Boolean(outboundReply.trim()), meeting_booked:meetingBooked, appointment_id:meetingAppointmentId || null, do_not_contact:intent === "unsubscribe" });
 }
 
+async function handleFollowups(request,env) {
+ const auth=await requireAdmin(request,env);if(auth.error)return auth.error;
+ const org="dev-donninger",url=new URL(request.url);
+ if(request.method==="GET") {
+  const row=await env.DB.prepare("SELECT status,sent_count,next_at,reason FROM sales_followups WHERE organisation_id=? AND lead_id=?").bind(org,url.searchParams.get("lead_id")||"").first();
+  return json({followup:row});
+ }
+ if(request.method!=="POST")return json({error:"Method not allowed."},405);
+ let body;try{body=await request.json();}catch{return json({error:"Invalid request."},400);}
+ const lead=await env.DB.prepare("SELECT id,email FROM leads WHERE organisation_id=? AND id=?").bind(org,String(body.lead_id||"")).first();
+ if(!lead)return json({error:"Lead not found."},404);
+ if(body.action==="stop")await suppressEmail(env.DB,org,lead.email,"Manually stopped by admin");
+ else if(body.action==="cancel")await cancelFollowups(env.DB,org,lead.id,"Cancelled by admin");
+ else if(body.action==="pause")await env.DB.prepare("UPDATE sales_followups SET status='paused',reason='Paused by admin' WHERE organisation_id=? AND lead_id=? AND status='active'").bind(org,lead.id).run();
+ else if(body.action==="resume")await env.DB.prepare("UPDATE sales_followups SET status='active',reason='' WHERE organisation_id=? AND lead_id=? AND status='paused'").bind(org,lead.id).run();
+ else return json({error:"Unknown action."},400);
+ await env.DB.prepare("INSERT INTO sales_activity(id,organisation_id,lead_id,activity_type,details_json,actor) VALUES (?,?,?,'outreach_control',?,?)").bind(crypto.randomUUID(),org,lead.id,JSON.stringify({action:body.action}),auth.session.email).run();
+ return json({success:true});
+}
+
 async function handleApi(request, env) {
   const url = new URL(request.url);
+  if (url.pathname === "/api/sales/followups") return handleFollowups(request,env);
   if (url.pathname === "/api/reports/send") return handleReportSend(request, env);
   if (url.pathname === "/api/sales/leads") return handleSalesLeads(request, env);
    if (url.pathname === "/api/sales/leads/import") return handleSalesLeadImport(request, env);
@@ -1348,6 +1383,7 @@ async function handleApi(request, env) {
   return json({ error: "Not found." }, 404);
 }
 export default {
+  async scheduled(event,env,ctx) { ctx.waitUntil(processFollowups(env,sendMeetingEmail)); },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/meeting/respond") return handleClientMeetingResponse(request, env);
